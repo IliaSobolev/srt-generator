@@ -74,6 +74,8 @@ public struct AudioLoader: AudioDecoding {
         try Task.checkCancellation()
 
         guard process.terminationStatus == 0 else {
+            // Lossy decoding on purpose: show whatever ffmpeg printed, even if it isn't valid UTF-8.
+            // swiftlint:disable:next optional_data_string_conversion
             throw ffmpegError(String(decoding: errPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
         }
         let data = try Data(contentsOf: out)

@@ -197,13 +197,16 @@ struct LongSleeper: Sleeper {
 // MARK: - Fixtures
 
 enum Fixtures {
+    // Catalog constants; DomainTests asserts these ids exist, so a typo fails loudly there too.
+    // swiftlint:disable force_unwrapping
     static let whisper = ModelCatalog.model(id: "small")!
     static let parakeetV2 = ModelCatalog.model(id: "parakeet-tdt-0.6b-v2")!
     static let parakeetV3 = ModelCatalog.model(id: "parakeet-tdt-0.6b-v3")!
 
     static func defaults() -> UserDefaults {
         let name = "SRTCoreTests-\(UUID().uuidString)"
-        let d = UserDefaults(suiteName: name)!
+        let d = UserDefaults(suiteName: name)! // nil only for reserved suite names
+        // swiftlint:enable force_unwrapping
         d.removePersistentDomain(forName: name)
         return d
     }

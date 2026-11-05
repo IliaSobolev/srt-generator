@@ -1,0 +1,97 @@
+# SwiftLint config. `make lint` runs it in --strict mode (warnings fail).
+# Size limits start from today's code (see docs/ARCHITECTURE.md); tighten them over time, never loosen silently.
+included:
+  - Sources
+  - Tests
+excluded:
+  - .build
+  - .tools
+  - dist
+
+opt_in_rules:
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - fatal_error_message
+  - discouraged_optional_boolean
+  - empty_count
+  - first_where
+  - contains_over_first_not_nil
+  - last_where
+  - redundant_nil_coalescing
+  - unowned_variable_capture
+  - weak_delegate
+  - private_action
+  - private_outlet
+  - overridden_super_call
+  - yoda_condition
+  - convenience_type
+  - sorted_first_last
+  - toggle_bool
+  - identical_operands
+  - unavailable_function
+
+# Style rules that conflict with SwiftFormat (which owns layout) or with the codebase's compact one-line bodies.
+# unused_parameter is not opted in: it flags required protocol/delegate signatures (NSApplicationDelegate, Sleeper).
+disabled_rules:
+  - opening_brace          # SwiftFormat decides brace placement for wrapped signatures
+  - trailing_comma         # SwiftFormat: --trailing-commas collections-only
+  - multiple_closures_with_trailing_closure # SwiftUI Button(action:) { label } is idiomatic
+  - identifier_name        # short names like `p`, `i`, `ms` are used deliberately in tight scopes
+
+line_length:
+  warning: 140
+  error: 160
+  ignores_urls: true
+
+# Baseline from the current code (largest: ContentView.swift 455 lines, JobQueue body ~140 lines).
+file_length:
+  warning: 500
+  error: 600
+type_body_length:
+  warning: 250
+  error: 350
+function_body_length:
+  warning: 60
+  error: 100
+cyclomatic_complexity:
+  warning: 10
+  error: 15
+  ignores_case_statements: true
+function_parameter_count:
+  warning: 6
+  error: 8
+  ignores_default_parameters: true
+nesting:
+  type_level: 2
+  function_level: 3
+large_tuple:
+  warning: 3
+  error: 4
+
+custom_rules:
+  # Architecture: SRTCore is pure logic. No UI frameworks (ViewModels use Observation, not SwiftUI/AppKit).
+  no_ui_frameworks_in_core:
+    name: "No UI frameworks in SRTCore"
+    included: "Sources/SRTCore/.*\\.swift"
+    regex: "^\\s*(@preconcurrency\\s+)?import\\s+(SwiftUI|AppKit|UIKit|Cocoa)\\b"
+    message: "SRTCore must not import UI frameworks. Put view code in Sources/SRTGenerator."
+    severity: error
+  # Architecture: third-party engines (and the networking they do) stay in the SRTEngines adapter module.
+  engines_only_in_adapter:
+    name: "Engine libraries only in SRTEngines"
+    excluded: "Sources/SRTEngines/.*"
+    regex: "^\\s*(@preconcurrency\\s+)?import\\s+(WhisperKit|FluidAudio|Hub|ArgmaxCore|Transformers)\\b"
+    message: "Only Sources/SRTEngines may import WhisperKit/FluidAudio (they download models from the network)."
+    severity: error
+  # Network policy: the app's own code never talks to the network directly. See scripts/check-network-policy.sh.
+  no_networking_apis:
+    name: "No networking APIs"
+    regex: "\\b(URLSession|URLRequest|NWConnection|NWListener|NWBrowser|NWEndpoint|CFSocket|CFStream|WKWebView|SFSafariViewController|ASWebAuthenticationSession)\\b|^\\s*import\\s+(Network|WebKit)\\b"
+    message: "Networking is only allowed inside model-download dependencies. Ask before adding any network path."
+    severity: error
+  # DI: no hand-rolled singletons. Wire dependencies in LiveDependencies (the composition root) instead.
+  no_singletons:
+    name: "No singletons"
+    regex: "static\\s+(let|var)\\s+(shared|default|instance|current)\\b"
+    message: "Don't declare singletons; inject a protocol through AppDependencies instead."
+    severity: error

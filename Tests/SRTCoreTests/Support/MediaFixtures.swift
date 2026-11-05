@@ -2,16 +2,19 @@ import AVFoundation
 import CoreVideo
 import Foundation
 
+enum FixtureError: Error { case setup }
+
 enum MediaFixtures {
     /// A mono 16 kHz WAV containing a 440 Hz tone.
     static func wav(seconds: Double = 0.5, in dir: URL) throws -> URL {
         let url = dir.appendingPathComponent("tone-\(UUID().uuidString).wav")
-        let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1)!
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1) else { throw FixtureError.setup }
         let file = try AVAudioFile(forWriting: url, settings: format.settings)
         let frames = AVAudioFrameCount(seconds * 16_000)
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: max(frames, 1))!
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: max(frames, 1)),
+              let channel = buffer.floatChannelData?[0] else { throw FixtureError.setup }
         buffer.frameLength = frames
-        for i in 0..<Int(frames) { buffer.floatChannelData![0][i] = sin(Float(i) * 2 * .pi * 440 / 16_000) * 0.5 }
+        for i in 0..<Int(frames) { channel[i] = sin(Float(i) * 2 * .pi * 440 / 16_000) * 0.5 }
         if frames > 0 { try file.write(from: buffer) }
         return url
     }
@@ -30,7 +33,8 @@ enum MediaFixtures {
         var pixelBuffer: CVPixelBuffer?
         CVPixelBufferCreate(nil, 64, 64, kCVPixelFormatType_32BGRA, nil, &pixelBuffer)
         while !input.isReadyForMoreMediaData { try await Task.sleep(for: .milliseconds(5)) }
-        adaptor.append(pixelBuffer!, withPresentationTime: .zero)
+        guard let pixelBuffer else { throw FixtureError.setup }
+        adaptor.append(pixelBuffer, withPresentationTime: .zero)
         input.markAsFinished()
         await writer.finishWriting()
         return url

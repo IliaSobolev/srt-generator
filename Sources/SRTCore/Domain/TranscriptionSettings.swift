@@ -60,6 +60,7 @@ public struct TranscriptionSettings: Codable, Equatable, Sendable {
 
     public func save(_ defaults: UserDefaults) {
         // Encoding a struct of plain values cannot fail.
+        // swiftlint:disable:next force_try
         defaults.set(try! JSONEncoder().encode(self), forKey: Self.key)
     }
 
