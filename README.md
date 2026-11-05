@@ -3,9 +3,10 @@
 A native macOS 26+ app that turns any audio or video file into `.srt` subtitles, **fully on-device**.
 Its interface uses the Liquid Glass design.
 
-- **Speech recognition:** OpenAI Whisper via [WhisperKit](https://github.com/argmaxinc/WhisperKit), running on CoreML (Neural Engine/GPU).
-  Supports 99 spoken languages with auto-detection. Each model downloads once to
-  `~/Library/Application Support/SRTGenerator`; after that, transcription works offline.
+- **Speech recognition:** the same model list as [HandyAI](https://github.com/JIEHT9U/HandyAI), using native CoreML builds:
+  OpenAI Whisper via [WhisperKit](https://github.com/argmaxinc/WhisperKit) (99 languages), and NVIDIA Parakeet via
+  [FluidAudio](https://github.com/FluidInference/FluidAudio). In **Settings → Models** (⌘,), one click downloads a model
+  and makes it active. After that, transcription works offline.
 - **Formats:** if `ffmpeg` is installed (`brew install ffmpeg`), any format it can read works (MKV, WebM, AVI, FLV, OGG, Opus, WMA, TS, …).
   Without ffmpeg, the app falls back to AVFoundation (MP4, MOV, M4A, MP3, WAV, AIFF, CAF, …).
 - **Output languages:**
@@ -27,17 +28,27 @@ Requires Xcode 26+ and Apple Silicon.
 
 ```sh
 "dist/SRT Generator.app/Contents/MacOS/SRTGenerator" --cli \
-    [--model tiny|base|small|626MB|turbo|large-v3] [--language auto|uk|de|…] [--english] [-o dir] files…
+    [--model small|medium|turbo|large|parakeet-tdt-0.6b-v2|parakeet-tdt-0.6b-v3] \
+    [--language auto|uk|de|…] [--english] [-o dir] files…
 ```
 
 ## Models
 
-| Model | Size | Notes |
-|---|---|---|
-| Tiny / Base | 75–145 MB | fast, lower accuracy |
-| Small | ~480 MB | good balance |
-| **Large v3 Turbo (compact)** | ~630 MB | default; near-best accuracy |
-| Large v3 Turbo | ~1.6 GB | |
-| Large v3 | ~3 GB | most accurate, slowest |
+| Model | Engine | Download | Languages | Notes |
+|---|---|---|---|---|
+| Whisper Small (default) | Whisper | 486 MB | 99 | Fast and fairly accurate |
+| Whisper Medium | Whisper | 1.5 GB | 99 | Good accuracy, medium speed |
+| Whisper Turbo | Whisper | 1.6 GB | 99 | Balanced accuracy and speed |
+| Whisper Large | Whisper | 948 MB | 99 | Good accuracy, but slow (quantized large-v3) |
+| Parakeet V2 | Parakeet | ~470 MB | English | Best for English |
+| Parakeet V3 | Parakeet | ~480 MB | 25 European | Fast and accurate |
 
-The first time a model loads, CoreML compiles it for your Mac. This can take a few minutes. Later loads are fast.
+Whisper models are stored in `~/Library/Application Support/SRTGenerator`, Parakeet models in
+`~/Library/Application Support/FluidAudio`. The first time a model loads, CoreML compiles it for your Mac.
+
+## Settings
+
+- **Model Settings:** spoken language, translate to English (Whisper only), custom words (Whisper prompt),
+  Neural Engine or GPU, unload the model after an idle time, and Whisper options (VAD, temperature fallback,
+  non-speech suppression).
+- **Subtitles:** max characters per line, max cue duration, and output folder.
