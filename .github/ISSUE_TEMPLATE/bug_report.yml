@@ -1,0 +1,27 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Please don't attach private media. A short synthetic clip that reproduces the problem is ideal."
+  - type: textarea
+    id: what
+    attributes: { label: What happened?, description: Steps to reproduce, expected and actual result. }
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes: { label: App version, placeholder: "1.0.0 (About window or the DMG name)" }
+    validations: { required: true }
+  - type: input
+    id: macos
+    attributes: { label: macOS version and Mac model, placeholder: "macOS 26.1, MacBook Air M2" }
+    validations: { required: true }
+  - type: dropdown
+    id: model
+    attributes:
+      label: Model
+      options: [Whisper Small, Whisper Medium, Whisper Turbo, Whisper Large, Parakeet V2, Parakeet V3, Not model-related]
+  - type: input
+    id: format
+    attributes: { label: Input format, placeholder: "MKV / MP4 / M4A …, ffmpeg installed: yes/no" }
