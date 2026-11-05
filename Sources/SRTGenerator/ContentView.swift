@@ -1,3 +1,4 @@
+import SRTCore
 import SwiftUI
 import Translation
 import UniformTypeIdentifiers
@@ -8,14 +9,13 @@ struct ContentView: View {
     @State private var preview: URL?
 
     var body: some View {
-        @Bindable var translator = state.translator
         ZStack {
             AmbientBackground()
 
             VStack(spacing: 16) {
                 header
                 SettingsPanel()
-                if state.jobs.isEmpty {
+                if state.queue.jobs.isEmpty {
                     DropZone(isTargeted: isTargeted)
                 } else {
                     JobList(preview: $preview)
@@ -27,16 +27,15 @@ struct ContentView: View {
             .padding(.bottom, 20)
         }
         .dropDestination(for: URL.self) { urls, _ in
-            state.add(urls)
+            state.queue.add(urls)
             return true
         } isTargeted: { isTargeted = $0 }
         .sheet(item: $preview) { SRTPreview(url: $0) }
         // Hidden host for Apple's on-device Translation sessions.
         .background {
-            Color.clear.translationTask(translator.configuration) { session in
-                await state.translator.run(session)
-            }
+            if let bridge = state.translator as? TranslationBridge { TranslationHost(bridge: bridge) }
         }
+        .task { await state.loadTranslationTargets() }
     }
 
     private var header: some View {
@@ -62,19 +61,19 @@ struct ContentView: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
-            if !state.ffmpegAvailable {
+            if !state.supportsAllFormats {
                 Label("Install ffmpeg (brew install ffmpeg) to support MKV, WebM, OGG and more.",
                       systemImage: "exclamationmark.triangle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if state.jobs.contains(where: \.isFinished) && !state.isRunning {
-                Button("Clear Finished") { state.clearFinished() }
+            if state.queue.jobs.contains(where: \.isFinished) && !state.queue.isRunning {
+                Button("Clear Finished") { state.queue.clearFinished() }
                     .buttonStyle(.glass)
             }
-            if state.isRunning {
-                Button(role: .cancel) { state.cancel() } label: {
+            if state.queue.isRunning {
+                Button(role: .cancel) { state.queue.cancel() } label: {
                     Label("Stop", systemImage: "stop.fill")
                 }
                 .buttonStyle(.glass)
@@ -86,7 +85,7 @@ struct ContentView: View {
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.large)
-                .disabled(!state.jobs.contains { $0.status != .done })
+                .disabled(!state.queue.hasPendingWork)
                 .keyboardShortcut(.return, modifiers: .command)
             }
         }
@@ -147,7 +146,7 @@ struct SettingsPanel: View {
                         Button { openSettings() } label: {
                             HStack(spacing: 8) {
                                 Text(state.model.name).fontWeight(.medium)
-                                Text(state.downloadedModels.contains(state.model.id) ? state.model.languages : "not downloaded")
+                                Text(state.models.downloaded.contains(state.model.id) ? state.model.languages : "not downloaded")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Spacer(minLength: 4)
@@ -162,7 +161,7 @@ struct SettingsPanel: View {
                         Picker("Spoken language", selection: $state.languageCode) {
                             Text("Auto-detect").tag("auto")
                             Divider()
-                            ForEach(AppState.languages(for: state.model), id: \.code) { Text($0.name).tag($0.code) }
+                            ForEach(state.languageChoices, id: \.code) { Text($0.name).tag($0.code) }
                         }
                         .labelsHidden()
                         .disabled(!state.model.supportsLanguageSelection)
@@ -201,7 +200,7 @@ struct SettingsPanel: View {
             .padding(18)
             .glassEffect(.regular, in: .rect(cornerRadius: 26))
         }
-        .disabled(state.isRunning)
+        .disabled(state.queue.isRunning)
     }
 
     private func field<Content: View>(_ title: String, systemImage: String, @ViewBuilder content: () -> Content) -> some View {
@@ -227,11 +226,10 @@ struct TranslationTargetsMenu: View {
                 Button("Clear All") { state.extraTargets.removeAll() }
                 Divider()
             }
-            ForEach(state.translationTargets, id: \.minimalIdentifier) { lang in
-                let id = lang.minimalIdentifier
-                Toggle(TranslationBridge.displayName(lang), isOn: Binding(
+            ForEach(state.translationTargets, id: \.self) { id in
+                Toggle(Languages.displayName(id), isOn: Binding(
                     get: { state.extraTargets.contains(id) },
-                    set: { on in if on { state.extraTargets.insert(id) } else { state.extraTargets.remove(id) } }
+                    set: { state.setTarget(id, enabled: $0) }
                 ))
             }
         } label: {
@@ -243,7 +241,7 @@ struct TranslationTargetsMenu: View {
     }
 
     private var summary: String {
-        let names = state.extraTargets.sorted().map { TranslationBridge.displayName(Locale.Language(identifier: $0)) }
+        let names = state.extraTargets.sorted().map { Languages.displayName($0) }
         switch names.count {
         case 0: return "None"
         case 1...3: return names.joined(separator: ", ")
@@ -299,7 +297,7 @@ struct JobList: View {
         ScrollView {
             GlassEffectContainer(spacing: 10) {
                 LazyVStack(spacing: 10) {
-                    ForEach(state.jobs) { job in
+                    ForEach(state.queue.jobs) { job in
                         JobRow(job: job, preview: $preview)
                             .transition(.blurReplace)
                     }
@@ -308,7 +306,7 @@ struct JobList: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .animation(.smooth, value: state.jobs.map(\.id))
+        .animation(.smooth, value: state.queue.jobs.map(\.id))
     }
 }
 
@@ -365,8 +363,8 @@ struct JobRow: View {
                     } label: { Image(systemName: "folder") }
                         .help("Show in Finder")
                 }
-                if job.isFinished || !state.isRunning {
-                    Button { state.remove(job) } label: { Image(systemName: "xmark") }
+                if job.isFinished || !state.queue.isRunning {
+                    Button { state.queue.remove(job) } label: { Image(systemName: "xmark") }
                         .help("Remove")
                 }
             }

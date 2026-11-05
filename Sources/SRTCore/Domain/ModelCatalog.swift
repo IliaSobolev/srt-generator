@@ -1,10 +1,10 @@
 import Foundation
 
-enum EngineType: String, Codable, Sendable {
+public enum EngineType: String, Codable, Sendable, CaseIterable {
     case whisper
     case parakeet
 
-    var title: String {
+    public var title: String {
         switch self {
         case .whisper: "Whisper"
         case .parakeet: "Parakeet"
@@ -14,35 +14,56 @@ enum EngineType: String, Codable, Sendable {
 
 /// A speech model the user can download and select. The list mirrors HandyAI's model catalog
 /// (https://github.com/JIEHT9U/HandyAI), using native CoreML builds of the same models.
-struct ModelInfo: Identifiable, Hashable, Sendable {
-    let id: String
-    let name: String
-    let description: String
-    let sizeMB: Int
-    let engine: EngineType
-    let accuracy: Double // 0...1, higher is more accurate
-    let speed: Double // 0...1, higher is faster
-    let languages: String
+public struct ModelInfo: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let name: String
+    public let description: String
+    public let sizeMB: Int
+    public let engine: EngineType
+    /// 0...1, higher is more accurate.
+    public let accuracy: Double
+    /// 0...1, higher is faster.
+    public let speed: Double
+    public let languages: String
     /// Whisper can translate any language to English.
-    let supportsTranslation: Bool
+    public let supportsTranslation: Bool
     /// Whether the spoken language can be chosen manually.
-    let supportsLanguageSelection: Bool
+    public let supportsLanguageSelection: Bool
     /// WhisperKit variant folder in argmaxinc/whisperkit-coreml.
-    let whisperVariant: String?
+    public let whisperVariant: String?
     /// Spoken languages the model accepts as a hint; nil = every Whisper language.
-    var languageCodes: [String]? = nil
+    public let languageCodes: [String]?
 
-    func supportsLanguage(_ code: String) -> Bool {
-        supportsLanguageSelection && (languageCodes?.contains(code) ?? true)
+    public init(
+        id: String, name: String, description: String, sizeMB: Int, engine: EngineType,
+        accuracy: Double, speed: Double, languages: String, supportsTranslation: Bool,
+        supportsLanguageSelection: Bool, whisperVariant: String?, languageCodes: [String]? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.sizeMB = sizeMB
+        self.engine = engine
+        self.accuracy = accuracy
+        self.speed = speed
+        self.languages = languages
+        self.supportsTranslation = supportsTranslation
+        self.supportsLanguageSelection = supportsLanguageSelection
+        self.whisperVariant = whisperVariant
+        self.languageCodes = languageCodes
     }
 
-    var sizeText: String {
+    public var sizeText: String {
         sizeMB >= 1000 ? String(format: "%.1f GB", Double(sizeMB) / 1000) : "\(sizeMB) MB"
+    }
+
+    public func supportsLanguage(_ code: String) -> Bool {
+        supportsLanguageSelection && (languageCodes?.contains(code) ?? true)
     }
 }
 
-enum ModelCatalog {
-    static let all: [ModelInfo] = [
+public enum ModelCatalog {
+    public static let all: [ModelInfo] = [
         ModelInfo(id: "small", name: "Whisper Small", description: "Fast and fairly accurate.",
                   sizeMB: 486, engine: .whisper, accuracy: 0.60, speed: 0.85,
                   languages: "99 languages", supportsTranslation: true, supportsLanguageSelection: true,
@@ -70,12 +91,14 @@ enum ModelCatalog {
                   whisperVariant: nil, languageCodes: parakeetV3Languages),
     ]
 
-    static let defaultID = "small"
+    public static let defaultID = "small"
 
-    static let parakeetV3Languages = [
+    public static let parakeetV3Languages = [
         "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it",
         "lv", "lt", "mt", "pl", "pt", "ro", "sk", "sl", "es", "sv", "ru", "uk",
     ]
 
-    static func model(id: String) -> ModelInfo? { all.first { $0.id == id } }
+    public static var defaultModel: ModelInfo { all[0] }
+
+    public static func model(id: String) -> ModelInfo? { all.first { $0.id == id } }
 }

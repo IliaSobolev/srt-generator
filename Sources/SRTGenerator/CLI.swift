@@ -1,9 +1,12 @@
 import Foundation
+import SRTCore
 
-/// Headless mode: `SRTGenerator --cli [--model small] [--language auto|xx] [--english] [-o dir] files...`
+/// Headless mode: `SRTGenerator --cli [--model <id>] [--language auto|xx] [--english] [-o dir] files...`
+/// Runs the same JobQueue pipeline as the app, without touching the app's saved preferences.
+@MainActor
 enum CLI {
-    static func run(_ args: [String]) async {
-        var model = ModelCatalog.model(id: ModelCatalog.defaultID)!
+    static func run(_ args: [String]) async -> Int32 {
+        var model = ModelCatalog.defaultModel
         var language: String?
         var english = false
         var outDir: URL?
@@ -15,7 +18,7 @@ enum CLI {
             case "--model", "-m":
                 let v = it.next() ?? ""
                 guard let m = ModelCatalog.model(id: v) else {
-                    fail("Unknown model '\(v)'. Options: " + ModelCatalog.all.map(\.id).joined(separator: ", "))
+                    return fail("Unknown model '\(v)'. Options: " + ModelCatalog.all.map(\.id).joined(separator: ", "))
                 }
                 model = m
             case "--language", "-l":
@@ -25,42 +28,37 @@ enum CLI {
             case "--output", "-o": outDir = it.next().map { URL(fileURLWithPath: $0, isDirectory: true) }
             case "--help", "-h":
                 print("Usage: SRTGenerator --cli [--model <id>] [--language auto|<iso>] [--english] [-o dir] <files...>")
-                exit(0)
+                print("Models: " + ModelCatalog.all.map(\.id).joined(separator: ", "))
+                return 0
             default: files.append(URL(fileURLWithPath: a))
             }
         }
-        guard !files.isEmpty else { fail("No input files.") }
+        guard !files.isEmpty else { return fail("No input files.") }
 
-        do {
-            if !Transcriber.isDownloaded(model) {
-                FileHandle.standardError.write("Downloading \(model.name)…\n")
-                try await Transcriber.download(model) { _ in }
+        let deps = LiveDependencies.make(translation: false)
+        let state = AppState(deps)
+        let config = PipelineConfig(
+            model: model, language: language, translateToEnglish: english,
+            outputFolder: outDir, settings: TranscriptionSettings.load(deps.defaults))
+        state.queue.add(files)
+        FileHandle.standardError.write(Data("Transcribing with \(model.name)…\n".utf8))
+        await state.queue.start(config)?.value
+
+        var failed = false
+        for job in state.queue.jobs {
+            switch job.status {
+            case .done:
+                print(job.outputs.map(\.path).joined(separator: "\n") + "  [\(job.detectedLanguage ?? "?")]")
+            default:
+                failed = true
+                FileHandle.standardError.write(Data("✗ \(job.url.lastPathComponent): \(job.status)\n".utf8))
             }
-            FileHandle.standardError.write("Loading \(model.name)…\n")
-            let t = Transcriber()
-            let settings = TranscriptionSettings.load()
-            try await t.load(model, compute: settings.compute)
-            for file in files {
-                FileHandle.standardError.write("→ \(file.lastPathComponent)\n")
-                let samples = try await AudioLoader.load(file)
-                let out = try await t.transcribe(samples: samples, language: language, translate: english && model.supportsTranslation, settings: settings) { _ in }
-                let dir = outDir ?? file.deletingLastPathComponent()
-                let dest = dir.appendingPathComponent(file.deletingPathExtension().lastPathComponent + (english ? ".en" : ""))
-                    .appendingPathExtension("srt")
-                try SRTWriter.render(out.cues).write(to: dest, atomically: true, encoding: .utf8)
-                print("\(dest.path)  [\(out.language), \(out.cues.count) cues]")
-            }
-        } catch {
-            fail(error.localizedDescription)
         }
+        return failed ? 1 : 0
     }
 
-    private static func fail(_ msg: String) -> Never {
-        FileHandle.standardError.write("error: \(msg)\n")
-        exit(1)
+    private static func fail(_ msg: String) -> Int32 {
+        FileHandle.standardError.write(Data("error: \(msg)\n".utf8))
+        return 1
     }
-}
-
-extension FileHandle {
-    func write(_ s: String) { write(Data(s.utf8)) }
 }

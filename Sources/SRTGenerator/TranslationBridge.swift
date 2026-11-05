@@ -1,16 +1,20 @@
 import Foundation
 import Observation
+import SRTCore
+import SwiftUI
 import Translation
 
 /// Bridges Apple's on-device Translation framework (which hands out sessions via a SwiftUI
-/// modifier) to plain async calls. All translation runs locally on the Mac.
+/// modifier) to SRTCore's `Translating` protocol. All translation runs locally on the Mac.
 @MainActor @Observable
-final class TranslationBridge {
+final class TranslationBridge: Translating {
     var configuration: TranslationSession.Configuration?
     private var pending: (texts: [String], continuation: CheckedContinuation<[String], Error>)?
 
-    func translate(_ texts: [String], from source: Locale.Language?, to target: Locale.Language) async throws -> [String] {
+    func translate(_ texts: [String], from source: String, to target: String) async throws -> [String] {
         guard !texts.isEmpty else { return [] }
+        let source = Locale.Language(identifier: source)
+        let target = Locale.Language(identifier: target)
         return try await withCheckedThrowingContinuation { continuation in
             pending = (texts, continuation)
             if configuration?.source == source, configuration?.target == target {
@@ -19,6 +23,11 @@ final class TranslationBridge {
                 configuration = .init(source: source, target: target)
             }
         }
+    }
+
+    func supportedTargets() async -> [String] {
+        let langs = await LanguageAvailability().supportedLanguages
+        return Array(Set(langs.map(\.minimalIdentifier)))
     }
 
     func run(_ session: TranslationSession) async {
@@ -38,18 +47,15 @@ final class TranslationBridge {
             job.continuation.resume(throwing: error)
         }
     }
+}
 
-    static func supportedTargets() async -> [Locale.Language] {
-        let langs = await LanguageAvailability().supportedLanguages
-        var seen = Set<String>()
-        return langs
-            .filter { seen.insert($0.minimalIdentifier).inserted }
-            .sorted { displayName($0) < displayName($1) }
-    }
+/// Invisible view that receives Translation sessions for the bridge.
+struct TranslationHost: View {
+    @Bindable var bridge: TranslationBridge
 
-    static func displayName(_ lang: Locale.Language) -> String {
-        Locale.current.localizedString(forIdentifier: lang.maximalIdentifier)
-            ?? Locale.current.localizedString(forIdentifier: lang.minimalIdentifier)
-            ?? lang.minimalIdentifier
+    var body: some View {
+        Color.clear.translationTask(bridge.configuration) { session in
+            await bridge.run(session)
+        }
     }
 }

@@ -1,9 +1,9 @@
 import Foundation
 
-enum ComputeTarget: String, Codable, CaseIterable, Identifiable, Sendable {
+public enum ComputeTarget: String, Codable, CaseIterable, Identifiable, Sendable {
     case neuralEngine, gpu
-    var id: String { rawValue }
-    var title: String {
+    public var id: String { rawValue }
+    public var title: String {
         switch self {
         case .neuralEngine: "Neural Engine (efficient)"
         case .gpu: "GPU (often faster on Pro/Max chips)"
@@ -11,15 +11,15 @@ enum ComputeTarget: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum UnloadTimeout: Int, Codable, CaseIterable, Identifiable, Sendable {
+public enum UnloadTimeout: Int, Codable, CaseIterable, Identifiable, Sendable {
     case never = -1
     case immediately = 0
     case min2 = 120
     case min5 = 300
     case min15 = 900
     case hour1 = 3600
-    var id: Int { rawValue }
-    var title: String {
+    public var id: Int { rawValue }
+    public var title: String {
         switch self {
         case .never: "Never"
         case .immediately: "Immediately after a batch"
@@ -32,39 +32,39 @@ enum UnloadTimeout: Int, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 /// User-tunable model settings, persisted as JSON in UserDefaults.
-struct TranscriptionSettings: Codable, Equatable, Sendable {
+public struct TranscriptionSettings: Codable, Equatable, Sendable {
     // Shared (HandyAI-style)
-    var customWords: [String] = []
-    var unloadTimeout: UnloadTimeout = .min5
-    var compute: ComputeTarget = .neuralEngine
+    public var customWords: [String] = []
+    public var unloadTimeout: UnloadTimeout = .min5
+    public var compute: ComputeTarget = .neuralEngine
 
     // Whisper
-    var whisperVAD = true
-    var whisperTemperatureFallback = true
-    var whisperSuppressNonSpeech = true
+    public var whisperVAD = true
+    public var whisperTemperatureFallback = true
+    public var whisperSuppressNonSpeech = true
 
     // Subtitles
-    var maxLineLength = 42
-    var maxCueDuration = 7.0
+    public var maxLineLength = 42
+    public var maxCueDuration = 7.0
 
-    var cueBuilder: CueBuilder { CueBuilder(maxLineLength: maxLineLength, maxDuration: maxCueDuration) }
+    public init() {}
 
-    static let key = "transcriptionSettings"
+    public var cueBuilder: CueBuilder { CueBuilder(maxLineLength: maxLineLength, maxDuration: maxCueDuration) }
 
-    static func load(_ defaults: UserDefaults = .standard) -> TranscriptionSettings {
-        guard let data = defaults.data(forKey: key),
-              let s = try? JSONDecoder().decode(TranscriptionSettings.self, from: data) else { return .init() }
-        return s
+    public static let key = "transcriptionSettings"
+
+    public static func load(_ defaults: UserDefaults) -> TranscriptionSettings {
+        let data = defaults.data(forKey: key)
+        return data.flatMap { try? JSONDecoder().decode(TranscriptionSettings.self, from: $0) } ?? .init()
     }
 
-    func save(_ defaults: UserDefaults = .standard) {
-        if let data = try? JSONEncoder().encode(self) { defaults.set(data, forKey: Self.key) }
+    public func save(_ defaults: UserDefaults) {
+        // Encoding a struct of plain values cannot fail.
+        defaults.set(try! JSONEncoder().encode(self), forKey: Self.key)
     }
-}
 
-extension TranscriptionSettings {
     // Tolerate settings saved by older versions that lack newer keys.
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = TranscriptionSettings()
         customWords = try c.decodeIfPresent([String].self, forKey: .customWords) ?? d.customWords

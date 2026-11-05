@@ -1,3 +1,4 @@
+import SRTCore
 import SwiftUI
 
 struct SettingsView: View {
@@ -28,7 +29,7 @@ struct ModelOptionsView: View {
                 Picker("Spoken language", selection: $state.languageCode) {
                     Text("Auto-detect").tag("auto")
                     Divider()
-                    ForEach(AppState.languages(for: model), id: \.code) { Text($0.name).tag($0.code) }
+                    ForEach(state.languageChoices, id: \.code) { Text($0.name).tag($0.code) }
                 }
                 .disabled(!model.supportsLanguageSelection)
                 Toggle("Translate to English", isOn: Binding(
@@ -100,7 +101,7 @@ struct ModelOptionsView: View {
             }
         }
         .formStyle(.grouped)
-        .disabled(state.isRunning)
+        .disabled(state.queue.isRunning)
     }
 
     private func addWord() {
@@ -148,7 +149,7 @@ struct SubtitleOptionsView: View {
             }
         }
         .formStyle(.grouped)
-        .disabled(state.isRunning)
+        .disabled(state.queue.isRunning)
     }
 }
 
@@ -177,7 +178,7 @@ struct ModelsSettingsView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button("Show Models Folder") {
-                        let url = Transcriber.modelFolder(state.model).deletingLastPathComponent()
+                        let url = state.models.folder(for: state.model).deletingLastPathComponent()
                         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
                         NSWorkspace.shared.open(url)
                     }
@@ -195,8 +196,8 @@ struct ModelCard: View {
     @State private var confirmDelete = false
 
     private var isActive: Bool { state.model.id == model.id }
-    private var isDownloaded: Bool { state.downloadedModels.contains(model.id) }
-    private var progress: Double? { state.modelDownloads[model.id] }
+    private var isDownloaded: Bool { state.models.downloaded.contains(model.id) }
+    private var progress: Double? { state.models.progress[model.id] }
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
@@ -229,7 +230,7 @@ struct ModelCard: View {
                         Text("Downloading… \(Int(progress * 100))%").font(.caption)
                     }
                 }
-                if let error = state.modelDownloadErrors[model.id] {
+                if let error = state.models.errors[model.id] {
                     Text(error).font(.caption).foregroundStyle(.red).lineLimit(3)
                 }
             }
@@ -243,15 +244,15 @@ struct ModelCard: View {
             in: .rect(cornerRadius: 20)
         )
         .contentShape(.rect(cornerRadius: 20))
-        .onTapGesture { if progress == nil { state.downloadAndUse(model) } }
+        .onTapGesture { if progress == nil { state.use(model) } }
         .contextMenu {
             if isDownloaded {
-                Button("Use This Model") { state.downloadAndUse(model) }
+                Button("Use This Model") { state.use(model) }
                 Button("Delete Download", role: .destructive) { confirmDelete = true }
             }
         }
         .confirmationDialog("Delete \(model.name)?", isPresented: $confirmDelete) {
-            Button("Delete", role: .destructive) { state.deleteModel(model) }
+            Button("Delete", role: .destructive) { state.models.delete(model) }
         } message: {
             Text("Frees \(model.sizeText). You can download it again at any time.")
         }
@@ -261,7 +262,7 @@ struct ModelCard: View {
 
     @ViewBuilder private var action: some View {
         if progress != nil {
-            Button("Cancel") { state.cancelDownload(model) }
+            Button("Cancel") { state.models.cancelDownload(model) }
                 .buttonStyle(.glass)
         } else if isActive && isDownloaded {
             Image(systemName: "checkmark.circle.fill")
@@ -269,15 +270,15 @@ struct ModelCard: View {
                 .foregroundStyle(Color.accentColor)
         } else if isDownloaded {
             HStack(spacing: 6) {
-                Button("Use") { state.downloadAndUse(model) }
+                Button("Use") { state.use(model) }
                     .buttonStyle(.glassProminent)
                 Button { confirmDelete = true } label: { Image(systemName: "trash") }
                     .buttonStyle(.glass)
-                    .disabled(state.isRunning && isActive)
+                    .disabled(state.queue.isRunning && isActive)
                     .help("Delete download")
             }
         } else {
-            Button { state.downloadAndUse(model) } label: {
+            Button { state.use(model) } label: {
                 Label("Download", systemImage: "arrow.down.circle")
             }
             .buttonStyle(.glassProminent)

@@ -1,3 +1,4 @@
+import SRTCore
 import SwiftUI
 
 @main
@@ -5,10 +6,7 @@ enum Entry {
     @MainActor static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
         if args.first == "--cli" {
-            Task.detached {
-                await CLI.run(Array(args.dropFirst()))
-                exit(0)
-            }
+            Task { @MainActor in exit(await CLI.run(Array(args.dropFirst()))) }
             dispatchMain()
         } else {
             SRTGeneratorApp.main()
@@ -45,10 +43,10 @@ struct SRTGeneratorApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let state = AppState()
+    let state = AppState(LiveDependencies.make())
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        state.add(urls)
+        state.queue.add(urls)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
