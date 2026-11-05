@@ -40,8 +40,7 @@ policy: ## Network policy check (APIs, hosts, entitlements, dependencies)
 actionlint: $(ACTIONLINT) ## Validate GitHub Actions workflows
 	@$(ACTIONLINT)
 
-ci: lint build coverage policy ## Everything CI runs (coverage includes the tests)
-	@[[ -d .github/workflows ]] && $(ACTIONLINT) || true
+ci: lint actionlint build coverage policy ## Everything CI runs (coverage includes the tests)
 	@echo "make ci: all checks passed"
 
 app: ## Build dist/SRT Generator.app (release, ad-hoc signed)
