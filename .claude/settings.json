@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push --force-with-lease *)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f *)",
+      "Bash(git push * -f)",
+      "Bash(git push * +*)"
+    ],
+    "ask": [
+      "Edit(**/*.entitlements)",
+      "Edit(**/config/allowed-hosts.txt)",
+      "Edit(**/config/allowed-dependencies.txt)",
+      "Edit(**/config/network-exceptions.txt)",
+      "Edit(**/Sources/SRTCore/Domain/ModelCatalog.swift)",
+      "Edit(**/scripts/check-network-policy.sh)",
+      "Bash(git push *)",
+      "Bash(gh repo create *)",
+      "Bash(gh release *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-lint.sh",
+            "timeout": 60,
+            "statusMessage": "SwiftFormat + SwiftLint + network policy"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-check.sh",
+            "timeout": 180,
+            "statusMessage": "Unit tests + network policy"
+          }
+        ]
+      }
+    ]
+  }
+}

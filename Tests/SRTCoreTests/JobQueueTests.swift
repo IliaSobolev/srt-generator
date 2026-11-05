@@ -1,6 +1,6 @@
 import Foundation
-import Testing
 @testable import SRTCore
+import Testing
 
 /// A JobQueue wired to fakes, with handles to every dependency.
 @MainActor
@@ -26,8 +26,8 @@ struct QueueHarness {
                          translator: translator, sleeper: sleeper)
     }
 
-    static let a = URL(fileURLWithPath: "/media/a.mp4")
-    static let b = URL(fileURLWithPath: "/media/b.mkv")
+    nonisolated static let a = URL(fileURLWithPath: "/media/a.mp4")
+    nonisolated static let b = URL(fileURLWithPath: "/media/b.mkv")
 
     func run(_ config: PipelineConfig = PipelineConfig(model: Fixtures.whisper), urls: [URL] = [a]) async -> [Job] {
         queue.add(urls)
@@ -86,7 +86,10 @@ struct JobQueueTests {
     @Test("Downloads a missing model first, showing download progress")
     func downloadsModel() async throws {
         let h = QueueHarness(downloaded: [])
-        h.provider.state.withLock { $0.downloadDelay = .milliseconds(150) } // hold at 75% so it is observable
+        h.provider.state.withLock {
+            $0.downloadDelay = .milliseconds(150) // hold at 75% so it is observable
+            $0.loadDelay = .milliseconds(150) // hold .loadingModel too; polling can miss a transient state
+        }
         h.queue.add([QueueHarness.a])
         let task = h.queue.start(PipelineConfig(model: Fixtures.parakeetV2))
         var seen: [Job.Status] = []
@@ -144,7 +147,7 @@ struct JobQueueTests {
         case "transcribe": h.engine.state.withLock { $0.error = .boom(stage) }
         default: h.writer.failingSuffix.withLock { $0 = .some(nil) }
         }
-        let expected: String = switch stage {
+        let expected = switch stage {
         case "silence": "The file has no audio track."
         case "noSpeech": "No speech detected."
         default: "boom: \(stage)"

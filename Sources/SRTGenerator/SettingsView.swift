@@ -89,8 +89,8 @@ struct ModelOptionsView: View {
                 Text("Whisper")
             } footer: {
                 Text(model.engine == .whisper
-                     ? "VAD makes long files faster and reduces hallucinations in silent parts."
-                     : "These options apply only to Whisper models.")
+                    ? "VAD makes long files faster and reduces hallucinations in silent parts."
+                    : "These options apply only to Whisper models.")
             }
             .disabled(model.engine != .whisper)
 
@@ -264,7 +264,7 @@ struct ModelCard: View {
         if progress != nil {
             Button("Cancel") { state.models.cancelDownload(model) }
                 .buttonStyle(.glass)
-        } else if isActive && isDownloaded {
+        } else if isActive, isDownloaded {
             Image(systemName: "checkmark.circle.fill")
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)

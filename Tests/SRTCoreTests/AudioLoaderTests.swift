@@ -1,7 +1,7 @@
 import AVFoundation
 import Foundation
-import Testing
 @testable import SRTCore
+import Testing
 
 @Suite("Audio loader")
 struct AudioLoaderTests {
@@ -23,8 +23,8 @@ struct AudioLoaderTests {
 
     @Test("Decodes with AVFoundation when ffmpeg is unavailable")
     func avFoundation() async throws {
-        let samples = try await AudioLoader(ffmpegURL: nil).decode(try MediaFixtures.wav(seconds: 0.5, in: dir))
-        #expect(samples.count == 8_000)
+        let samples = try await AudioLoader(ffmpegURL: nil).decode(MediaFixtures.wav(seconds: 0.5, in: dir))
+        #expect(samples.count == 8000)
         #expect(samples.contains { $0 > 0.4 })
     }
 
@@ -65,8 +65,8 @@ struct AudioLoaderTests {
     @Test("ffmpeg failures fall back to AVFoundation")
     func fallback() async throws {
         let ffmpeg = try MediaFixtures.fakeFFmpeg("echo 'Invalid data' >&2; exit 1", in: dir)
-        let samples = try await AudioLoader(ffmpegURL: ffmpeg).decode(try MediaFixtures.wav(in: dir))
-        #expect(samples.count == 8_000)
+        let samples = try await AudioLoader(ffmpegURL: ffmpeg).decode(MediaFixtures.wav(in: dir))
+        #expect(samples.count == 8000)
     }
 
     @Test("When both decoders fail, ffmpeg's error is reported")

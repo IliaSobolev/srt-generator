@@ -15,14 +15,56 @@ Its interface uses the Liquid Glass design.
   - Any number of extra languages via Apple's on-device Translation framework → `name.<lang>.srt`
 - Supports drag & drop, folders, batch queue, preview, and "Show in Finder". Existing `.srt` files are never overwritten.
 
-## Build
+## Download
+
+Get the latest `SRTGenerator-X.Y.Z.dmg` from the [Releases page](../../releases/latest).
+**Requires macOS 26 (Tahoe) or later on Apple Silicon.** Models aren't bundled; you download them in the app.
+
+**Verify the download** (optional): put the `.sha256` file next to the DMG and run
 
 ```sh
-./build-app.sh            # → dist/SRT Generator.app
-open "dist/SRT Generator.app"
+shasum -a 256 -c SRTGenerator-X.Y.Z.dmg.sha256   # prints "SRTGenerator-X.Y.Z.dmg: OK"
 ```
 
-Requires Xcode 26+ and Apple Silicon.
+**First launch (unsigned build).** Releases are not signed with an Apple Developer ID or notarized, so macOS
+Gatekeeper blocks the first launch ("Apple could not verify…"):
+
+1. Open the DMG and drag **SRT Generator** to **Applications**.
+2. Open the app once. When macOS blocks it, open **System Settings → Privacy & Security**, scroll to the message
+   about SRT Generator, and click **Open Anyway**, then confirm.
+3. Alternatively, in Terminal: `xattr -dr com.apple.quarantine "/Applications/SRT Generator.app"`.
+
+If you'd rather not trust a prebuilt binary, build it yourself (below). It takes about two minutes.
+
+## Privacy
+
+All transcription and translation happens **on your Mac**. Your video, audio, transcripts and subtitles never leave
+the device. The app has no backend, no accounts, no telemetry, no analytics, no crash reporting and no update checks.
+
+The only network traffic is downloading a speech model, and only when you click it in Settings → Models:
+
+| Host | Why |
+|---|---|
+| `huggingface.co` | Model files (WhisperKit / FluidAudio) and the Whisper tokenizer, fetched once on first use of a Whisper model |
+| `*.hf.co` (e.g. `us.aws.cdn.hf.co`) | Hugging Face's CDN, which serves the model weights |
+
+Hugging Face sees your IP address and which model you download, as with any download. Apple's Translation
+framework (for extra subtitle languages) downloads its language packs through macOS itself; the translation runs
+on-device. After a model is downloaded, the app works fully offline.
+
+This policy is enforced in CI (`scripts/check-network-policy.sh`); see
+[docs/adr/0002-network-policy.md](docs/adr/0002-network-policy.md).
+
+## Build from source
+
+```sh
+git clone <this repo> && cd srtgenerator
+make app                  # → dist/SRT Generator.app (or ./build-app.sh)
+open "dist/SRT Generator.app"
+make dmg                  # optional: dist/SRTGenerator-<version>.dmg + .sha256
+```
+
+Requires Xcode 26+ and Apple Silicon. Contributors: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## CLI
 
@@ -55,29 +97,21 @@ Whisper models are stored in `~/Library/Application Support/SRTGenerator`, Parak
 
 ## Architecture
 
-```
-SRTGenerator (app + CLI)   SwiftUI views, CLI, LiveDependencies (composition root),
-        │                  TranslationBridge (Apple Translation), PanelFilePicker (AppKit)
-        ▼
-SRTEngines                 WhisperProvider (WhisperKit), ParakeetProvider (FluidAudio)
-        │
-        ▼
-SRTCore                    AppState ─┬─ ModelManager   (downloads, one-click use)
-(no third-party deps)                ├─ JobQueue       (decode → transcribe → write → translate)
-                                     └─ TranscriptionService (loaded engine → subtitle cues)
-                           Protocols: ModelProvider, SpeechEngine, AudioDecoding, Translating,
-                                      SubtitleWriting, FilePicking, Sleeper
-```
+SwiftPM package with three modules (`SRTCore` logic, `SRTEngines` adapters, `SRTGenerator` app and composition
+root), MVVM, and dependency injection through protocols. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the
+decision records in [docs/adr](docs/adr).
 
-All dependencies are injected through `AppDependencies`. The app wires in the real implementations;
-tests wire in fakes.
-
-## Tests
+## Development
 
 ```sh
-swift test               # Swift Testing suite for SRTCore
-scripts/coverage.sh      # coverage table; fails unless SRTCore line coverage is 100%
+make ci          # lint, build (warnings = errors), tests + 100% SRTCore coverage gate, network policy
+make test        # unit + architecture tests
+make mutate      # mutation testing (slow, on demand)
 ```
 
-The `swift-test-writer` Claude Code subagent (`.claude/agents/swift-test-writer.md`) knows these conventions.
-Ask Claude to "use swift-test-writer" after changing `SRTCore`.
+Agents: `CLAUDE.md` holds the project rules for Claude Code. `.claude/agents/` has `swift-test-writer` (tests and
+coverage) and `reviewer` (read-only review).
+
+## License
+
+[MIT](LICENSE)

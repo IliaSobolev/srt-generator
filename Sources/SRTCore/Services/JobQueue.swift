@@ -100,7 +100,8 @@ public final class JobQueue {
 
             update(id) { $0.status = .transcribing(0) }
             let request = TranscriptionRequest(
-                language: config.language, translate: config.translateToEnglish, settings: config.settings)
+                language: config.language, translate: config.translateToEnglish, settings: config.settings
+            )
             let output = try await transcription.transcribe(samples: samples, request: request) { value in
                 Task { @MainActor in
                     self.update(id) { if case .transcribing = $0.status { $0.status = .transcribing(value) } }
@@ -110,7 +111,8 @@ public final class JobQueue {
             guard !output.cues.isEmpty else { throw TranscriptionError.noSpeech }
 
             let primary = try writer.write(
-                output.cues, for: job.url, suffix: config.translateToEnglish ? "en" : nil, folder: config.outputFolder)
+                output.cues, for: job.url, suffix: config.translateToEnglish ? "en" : nil, folder: config.outputFolder
+            )
             update(id) { $0.outputs.append(primary) }
 
             let textLanguage = config.translateToEnglish ? "en" : output.language

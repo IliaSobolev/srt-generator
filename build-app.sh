@@ -3,6 +3,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Version: VERSION file (SemVer) unless APP_VERSION overrides it; build number grows with every commit.
+APP_VERSION="${APP_VERSION:-$(tr -d '[:space:]' < VERSION)}"
+BUILD_NUMBER="${BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
+
 swift build -c release
 BIN="$(swift build -c release --show-bin-path)/SRTGenerator"
 APP="dist/SRT Generator.app"
@@ -23,8 +27,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleIdentifier</key><string>local.srtgenerator</string>
     <key>CFBundleExecutable</key><string>SRTGenerator</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.0</string>
-    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleShortVersionString</key><string>${APP_VERSION}</string>
+    <key>CFBundleVersion</key><string>${BUILD_NUMBER}</string>
     <key>LSMinimumSystemVersion</key><string>26.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.video</string>
     <key>NSHighResolutionCapable</key><true/>
@@ -42,4 +46,4 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 codesign --force --deep --sign - "$APP"
-echo "Built: $APP"
+echo "Built: $APP ($APP_VERSION, build $BUILD_NUMBER)"

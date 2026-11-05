@@ -29,7 +29,8 @@ public struct ParakeetProvider: ModelProvider {
     public func load(_ model: SRTCore.ModelInfo, compute: ComputeTarget) async throws -> any SpeechEngine {
         let version = Self.version(model)
         let models = try await AsrModels.load(
-            from: folder(for: model), version: version, encoderComputeUnits: compute == .gpu ? .cpuAndGPU : nil)
+            from: folder(for: model), version: version, encoderComputeUnits: compute == .gpu ? .cpuAndGPU : nil
+        )
         let manager = AsrManager()
         try await manager.loadModels(models)
         return ParakeetEngine(manager: manager, englishOnly: version == .v2)
@@ -41,8 +42,7 @@ struct ParakeetEngine: SpeechEngine {
     let englishOnly: Bool
 
     func transcribe(samples: [Float], request: TranscriptionRequest, progress: @escaping SRTCore.ProgressHandler)
-        async throws -> EngineResult
-    {
+        async throws -> EngineResult {
         let progressTask = Task {
             do { for try await p in await manager.transcriptionProgressStream { progress(p) } } catch {}
         }

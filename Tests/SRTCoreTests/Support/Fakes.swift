@@ -1,6 +1,6 @@
 import Foundation
-import Synchronization
 @testable import SRTCore
+import Synchronization
 
 enum TestError: Error, Equatable, LocalizedError {
     case boom(String)
@@ -21,7 +21,8 @@ func settle(_ ms: Int = 30) async {
 final class FakeEngine: SpeechEngine {
     struct State {
         var result = EngineResult(
-            segments: [SpeechSegment(start: 0, end: 1.5, text: " Hello world.")], language: "en")
+            segments: [SpeechSegment(start: 0, end: 1.5, text: " Hello world.")], language: "en"
+        )
         var error: TestError?
         var cancellable = false
         var delay: Duration?
@@ -33,8 +34,7 @@ final class FakeEngine: SpeechEngine {
     let state = Mutex(State())
 
     func transcribe(samples: [Float], request: TranscriptionRequest, progress: @escaping ProgressHandler)
-        async throws -> EngineResult
-    {
+        async throws -> EngineResult {
         let (values, delay, error, result) = state.withLock { s in
             s.requests.append(request)
             s.sampleCounts.append(samples.count)
@@ -60,6 +60,8 @@ final class FakeProvider: ModelProvider {
         var progressSteps: [Double] = [0.25, 0.75]
         /// Waits this long before finishing a download, ignoring cancellation.
         var downloadDelay: Duration?
+        /// Waits this long before returning a loaded engine, so `.loadingModel` is observable.
+        var loadDelay: Duration?
         /// Waits this long (cancellably) before finishing a download.
         var cancellableDelay: Duration?
         var progressAfterDelay: [Double] = []
@@ -104,10 +106,12 @@ final class FakeProvider: ModelProvider {
     }
 
     func load(_ model: ModelInfo, compute: ComputeTarget) async throws -> any SpeechEngine {
-        try state.withLock { s in
+        let delay = try state.withLock { s in
             s.loads.append((model.id, compute))
             if let error = s.loadError { throw error }
+            return s.loadDelay
         }
+        if let delay { try? await Task.sleep(for: delay) }
         return engine
     }
 }
@@ -197,13 +201,16 @@ struct LongSleeper: Sleeper {
 // MARK: - Fixtures
 
 enum Fixtures {
+    // Catalog constants; DomainTests asserts these ids exist, so a typo fails loudly there too.
+    // swiftlint:disable force_unwrapping
     static let whisper = ModelCatalog.model(id: "small")!
     static let parakeetV2 = ModelCatalog.model(id: "parakeet-tdt-0.6b-v2")!
     static let parakeetV3 = ModelCatalog.model(id: "parakeet-tdt-0.6b-v3")!
 
     static func defaults() -> UserDefaults {
         let name = "SRTCoreTests-\(UUID().uuidString)"
-        let d = UserDefaults(suiteName: name)!
+        let d = UserDefaults(suiteName: name)! // nil only for reserved suite names
+        // swiftlint:enable force_unwrapping
         d.removePersistentDomain(forName: name)
         return d
     }

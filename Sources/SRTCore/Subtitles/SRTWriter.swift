@@ -31,7 +31,7 @@ public enum SRTWriter {
         // Pick the split point that balances the two lines best.
         let best = (1..<words.count).min { a, b in
             longerHalf(words, at: a) < longerHalf(words, at: b)
-        }!
+        }! // swiftlint:disable:this force_unwrapping - the guard above ensures the range is non-empty.
         return words[..<best].joined(separator: " ") + "\n" + words[best...].joined(separator: " ")
     }
 
