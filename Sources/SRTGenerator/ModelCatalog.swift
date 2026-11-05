@@ -53,6 +53,15 @@ enum ModelCatalog {
                   sizeMB: 948, engine: .whisper, accuracy: 0.85, speed: 0.30,
                   languages: "99 languages", supportsTranslation: true, supportsLanguageSelection: true,
                   whisperVariant: "openai_whisper-large-v3_947MB"),
+        ModelInfo(id: "parakeet-tdt-0.6b-v2", name: "Parakeet V2",
+                  description: "English only. The best model for English speakers.",
+                  sizeMB: 473, engine: .parakeet, accuracy: 0.85, speed: 0.85,
+                  languages: "English", supportsTranslation: false, supportsLanguageSelection: false,
+                  whisperVariant: nil),
+        ModelInfo(id: "parakeet-tdt-0.6b-v3", name: "Parakeet V3", description: "Fast and accurate",
+                  sizeMB: 478, engine: .parakeet, accuracy: 0.80, speed: 0.85,
+                  languages: "25 European languages", supportsTranslation: false, supportsLanguageSelection: true,
+                  whisperVariant: nil),
     ]
 
     static let defaultID = "small"

@@ -204,7 +204,7 @@ final class AppState {
             try Task.checkCancellation()
 
             set(id) { $0.status = .transcribing(0) }
-            let translate = outputMode == .english
+            let translate = outputMode == .english && model.supportsTranslation
             let output = try await transcriber.transcribe(
                 samples: samples,
                 language: languageCode == "auto" ? nil : languageCode,
