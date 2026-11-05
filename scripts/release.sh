@@ -48,6 +48,13 @@ git rev-parse -q --verify "refs/tags/v$NEW" >/dev/null && die "tag v$NEW already
 say "Running make ci"
 make ci >/dev/null 2>&1 || { make ci 2>&1 | tail -30 >&2; die "make ci failed"; }
 
+EXISTING_SECTION=0
+if grep -qF "## [$NEW]" CHANGELOG.md; then
+    EXISTING_SECTION=1
+    say "CHANGELOG.md already has a section for $NEW; using it as is"
+    notes=$(awk -v v="$NEW" '$0 ~ "^## \\[" v "\\]" { f = 1 } f && /^## \[/ && $0 !~ "^## \\[" v "\\]" { exit } f { print }' CHANGELOG.md)
+    print -r -- "$notes"
+else
 say "Collecting merged PRs since ${LAST_TAG:-the first commit}"
 range="${LAST_TAG:+$LAST_TAG..}HEAD"
 typeset -A sections
@@ -75,6 +82,7 @@ for s in Added Changed Deprecated Removed Fixed Security; do
     [[ -n "${sections[$s]:-}" ]] && notes+=$'\n'"### $s"$'\n'"${sections[$s]}"
 done
 print -r -- "$notes"
+fi
 
 if (( DRY )); then
     say "Dry run: building the DMG for $NEW (no files, commits or tags are changed)"
@@ -85,7 +93,8 @@ if (( DRY )); then
 fi
 
 say "Updating VERSION and CHANGELOG.md"
-print -r -- "$NEW" > VERSION
+[[ "$(tr -d '[:space:]' < VERSION)" == "$NEW" ]] || print -r -- "$NEW" > VERSION
+if (( ! EXISTING_SECTION )); then
 python3 -I - "$notes" <<'PY'
 import sys, pathlib
 p = pathlib.Path("CHANGELOG.md")
@@ -97,13 +106,20 @@ if i < 0:
 j = text.find("\n", i) + 1
 p.write_text(text[:j] + "\n" + notes + text[j:].lstrip("\n"))
 PY
+fi
 git add VERSION CHANGELOG.md
-git commit -q -m "Release v$NEW"
+RELEASE_COMMIT=0
+if git diff --cached --quiet; then
+    say "VERSION and CHANGELOG.md already match $NEW; tagging the current commit"
+else
+    git commit -q -m "Release v$NEW"
+    RELEASE_COMMIT=1
+fi
 git tag -a "v$NEW" -m "Release v$NEW"
 
 say "Ready to push:"
 git log --oneline -1
-print "  tag:     v$NEW ($(git rev-parse --short "v$NEW"))"
+print "  tag:     v$NEW -> commit $(git rev-parse --short "v$NEW^{commit}")"
 print "  remote:  $(git remote get-url origin)"
 print "  GitHub Actions will build SRTGenerator-$NEW.dmg and publish the release."
 read -r "answer?Push commit and tag to origin? [y/N] "
@@ -112,5 +128,6 @@ if [[ "$answer" == [yY]* ]]; then
     git push origin "v$NEW"
     say "Pushed. Watch the release workflow on GitHub."
 else
-    say "Not pushed. To undo locally: git tag -d v$NEW && git reset --hard HEAD~1"
+    if (( RELEASE_COMMIT )); then undo="git tag -d v$NEW && git reset --hard HEAD~1"; else undo="git tag -d v$NEW"; fi
+    say "Not pushed. To undo locally: $undo"
 fi
