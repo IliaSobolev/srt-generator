@@ -86,7 +86,10 @@ struct JobQueueTests {
     @Test("Downloads a missing model first, showing download progress")
     func downloadsModel() async throws {
         let h = QueueHarness(downloaded: [])
-        h.provider.state.withLock { $0.downloadDelay = .milliseconds(150) } // hold at 75% so it is observable
+        h.provider.state.withLock {
+            $0.downloadDelay = .milliseconds(150) // hold at 75% so it is observable
+            $0.loadDelay = .milliseconds(150) // hold .loadingModel too; polling can miss a transient state
+        }
         h.queue.add([QueueHarness.a])
         let task = h.queue.start(PipelineConfig(model: Fixtures.parakeetV2))
         var seen: [Job.Status] = []

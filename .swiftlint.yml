@@ -86,6 +86,8 @@ custom_rules:
   # Network policy: the app's own code never talks to the network directly. See scripts/check-network-policy.sh.
   no_networking_apis:
     name: "No networking APIs"
+    # The architecture tests list these API names as data in order to forbid them.
+    excluded: "Tests/ArchitectureTests/.*"
     regex: "\\b(URLSession|URLRequest|NWConnection|NWListener|NWBrowser|NWEndpoint|CFSocket|CFStream|WKWebView|SFSafariViewController|ASWebAuthenticationSession)\\b|^\\s*import\\s+(Network|WebKit)\\b"
     message: "Networking is only allowed inside model-download dependencies. Ask before adding any network path."
     severity: error

@@ -60,6 +60,8 @@ final class FakeProvider: ModelProvider {
         var progressSteps: [Double] = [0.25, 0.75]
         /// Waits this long before finishing a download, ignoring cancellation.
         var downloadDelay: Duration?
+        /// Waits this long before returning a loaded engine, so `.loadingModel` is observable.
+        var loadDelay: Duration?
         /// Waits this long (cancellably) before finishing a download.
         var cancellableDelay: Duration?
         var progressAfterDelay: [Double] = []
@@ -104,10 +106,12 @@ final class FakeProvider: ModelProvider {
     }
 
     func load(_ model: ModelInfo, compute: ComputeTarget) async throws -> any SpeechEngine {
-        try state.withLock { s in
+        let delay = try state.withLock { s in
             s.loads.append((model.id, compute))
             if let error = s.loadError { throw error }
+            return s.loadDelay
         }
+        if let delay { try? await Task.sleep(for: delay) }
         return engine
     }
 }

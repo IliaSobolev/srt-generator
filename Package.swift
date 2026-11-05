@@ -41,5 +41,7 @@ let package = Package(
             path: "Tests/SRTCoreTests",
             swiftSettings: settings
         ),
+        // Structural rules (docs/ARCHITECTURE.md), checked by scanning the source tree. No app dependencies.
+        .testTarget(name: "ArchitectureTests", path: "Tests/ArchitectureTests", swiftSettings: settings),
     ]
 )
