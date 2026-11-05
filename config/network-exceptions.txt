@@ -1,0 +1,5 @@
+# Explicit exceptions to scripts/check-network-policy.sh. Format: <path-glob>|<regex>|<reason>
+# Every line needs a reason. Keep this list short; review it in every PR that touches it.
+#
+# Doc comment crediting the project whose model list we mirror; not contacted at runtime.
+Sources/SRTCore/Domain/ModelCatalog.swift|https://github\.com/JIEHT9U/HandyAI|attribution link in a comment

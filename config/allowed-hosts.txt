@@ -1,0 +1,8 @@
+# Hosts the app may contact. Changing this file needs explicit maintainer approval (see CLAUDE.md).
+# One host per line; "*.example.com" matches any subdomain. Checked by scripts/check-network-policy.sh.
+#
+# Model downloads (WhisperKit via swift-transformers Hub, and FluidAudio) plus the Whisper tokenizer,
+# which WhisperKit fetches from huggingface.co/openai/whisper-* the first time a model loads.
+huggingface.co
+# Hugging Face redirects model weights to its CDN (observed: us.aws.cdn.hf.co/xet-bridge-us/...).
+*.hf.co
