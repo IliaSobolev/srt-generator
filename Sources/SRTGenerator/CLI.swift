@@ -3,7 +3,7 @@ import Foundation
 /// Headless mode: `SRTGenerator --cli [--model small] [--language auto|xx] [--english] [-o dir] files...`
 enum CLI {
     static func run(_ args: [String]) async {
-        var model = WhisperModel.turboCompact
+        var model = ModelCatalog.model(id: ModelCatalog.defaultID)!
         var language: String?
         var english = false
         var outDir: URL?
@@ -14,8 +14,8 @@ enum CLI {
             switch a {
             case "--model", "-m":
                 let v = it.next() ?? ""
-                guard let m = WhisperModel.allCases.first(where: { $0.rawValue.hasSuffix(v) || $0.rawValue == v }) else {
-                    fail("Unknown model '\(v)'. Options: tiny, base, small, 626MB, turbo, large-v3")
+                guard let m = ModelCatalog.model(id: v) else {
+                    fail("Unknown model '\(v)'. Options: " + ModelCatalog.all.map(\.id).joined(separator: ", "))
                 }
                 model = m
             case "--language", "-l":
@@ -24,7 +24,7 @@ enum CLI {
             case "--english", "-e": english = true
             case "--output", "-o": outDir = it.next().map { URL(fileURLWithPath: $0, isDirectory: true) }
             case "--help", "-h":
-                print("Usage: SRTGenerator --cli [--model tiny|base|small|626MB|turbo|large-v3] [--language auto|<iso>] [--english] [-o dir] <files...>")
+                print("Usage: SRTGenerator --cli [--model <id>] [--language auto|<iso>] [--english] [-o dir] <files...>")
                 exit(0)
             default: files.append(URL(fileURLWithPath: a))
             }
@@ -33,10 +33,10 @@ enum CLI {
 
         do {
             if !Transcriber.isDownloaded(model) {
-                FileHandle.standardError.write("Downloading \(model.title)…\n")
+                FileHandle.standardError.write("Downloading \(model.name)…\n")
                 try await Transcriber.download(model) { _ in }
             }
-            FileHandle.standardError.write("Loading \(model.title)…\n")
+            FileHandle.standardError.write("Loading \(model.name)…\n")
             let t = Transcriber()
             try await t.load(model)
             for file in files {

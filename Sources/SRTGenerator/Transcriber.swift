@@ -1,39 +1,6 @@
 import Foundation
 import WhisperKit
 
-enum WhisperModel: String, CaseIterable, Identifiable, Codable {
-    case tiny = "openai_whisper-tiny"
-    case base = "openai_whisper-base"
-    case small = "openai_whisper-small"
-    case turboCompact = "openai_whisper-large-v3-v20240930_626MB"
-    case turbo = "openai_whisper-large-v3-v20240930_turbo"
-    case largeV3 = "openai_whisper-large-v3"
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .tiny: "Tiny"
-        case .base: "Base"
-        case .small: "Small"
-        case .turboCompact: "Large v3 Turbo (compact)"
-        case .turbo: "Large v3 Turbo"
-        case .largeV3: "Large v3"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .tiny: "~75 MB · fastest, lowest accuracy"
-        case .base: "~145 MB · fast"
-        case .small: "~480 MB · good balance"
-        case .turboCompact: "~630 MB · recommended, near-best accuracy"
-        case .turbo: "~1.6 GB · best speed/accuracy"
-        case .largeV3: "~3 GB · most accurate, slowest"
-        }
-    }
-}
-
 /// Owns local model storage and the loaded WhisperKit pipeline.
 actor Transcriber {
     static let storageRoot: URL = {
@@ -41,32 +8,33 @@ actor Transcriber {
         return base.appendingPathComponent("SRTGenerator", isDirectory: true)
     }()
 
-    static func modelFolder(_ model: WhisperModel) -> URL {
-        storageRoot.appendingPathComponent("models/argmaxinc/whisperkit-coreml/\(model.rawValue)", isDirectory: true)
+    static func modelFolder(_ model: ModelInfo) -> URL {
+        storageRoot.appendingPathComponent("models/argmaxinc/whisperkit-coreml/\(model.whisperVariant ?? model.id)",
+                                           isDirectory: true)
     }
 
-    static func isDownloaded(_ model: WhisperModel) -> Bool {
+    static func isDownloaded(_ model: ModelInfo) -> Bool {
         let folder = modelFolder(model)
         return ["AudioEncoder.mlmodelc", "TextDecoder.mlmodelc", "MelSpectrogram.mlmodelc"].allSatisfy {
             FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path)
         }
     }
 
-    static func delete(_ model: WhisperModel) throws {
+    static func delete(_ model: ModelInfo) throws {
         try FileManager.default.removeItem(at: modelFolder(model))
     }
 
-    static func download(_ model: WhisperModel, progress: @escaping @Sendable (Double) -> Void) async throws {
+    static func download(_ model: ModelInfo, progress: @escaping @Sendable (Double) -> Void) async throws {
         try FileManager.default.createDirectory(at: storageRoot, withIntermediateDirectories: true)
-        _ = try await WhisperKit.download(variant: model.rawValue, downloadBase: storageRoot) { p in
+        _ = try await WhisperKit.download(variant: model.whisperVariant ?? model.id, downloadBase: storageRoot) { p in
             progress(p.fractionCompleted)
         }
     }
 
     private var pipe: WhisperKit?
-    private var loadedModel: WhisperModel?
+    private var loadedModel: ModelInfo?
 
-    func load(_ model: WhisperModel) async throws {
+    func load(_ model: ModelInfo) async throws {
         if loadedModel == model, pipe != nil { return }
         pipe = nil
         let config = WhisperKitConfig(

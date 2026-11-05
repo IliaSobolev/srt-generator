@@ -46,7 +46,7 @@ enum OutputMode: String, CaseIterable, Identifiable {
 @MainActor @Observable
 final class AppState {
     // MARK: Settings (persisted)
-    var model: WhisperModel { didSet { defaults.set(model.rawValue, forKey: "model") } }
+    var model: ModelInfo { didSet { defaults.set(model.id, forKey: "modelID") } }
     var languageCode: String { didSet { defaults.set(languageCode, forKey: "language") } } // "auto" or ISO
     var outputMode: OutputMode { didSet { defaults.set(outputMode.rawValue, forKey: "outputMode") } }
     var extraTargets: Set<String> { didSet { defaults.set(Array(extraTargets), forKey: "extraTargets") } }
@@ -55,8 +55,8 @@ final class AppState {
     // MARK: Runtime
     var jobs: [Job] = []
     var isRunning = false
-    var downloadedModels: Set<WhisperModel> = []
-    var modelDownloads: [WhisperModel: Double] = [:]
+    var downloadedModels: Set<String> = []
+    var modelDownloads: [String: Double] = [:]
     var translationTargets: [Locale.Language] = []
     var lastError: String?
     let translator = TranslationBridge()
@@ -73,7 +73,7 @@ final class AppState {
         .sorted { $0.name < $1.name }
 
     init() {
-        model = WhisperModel(rawValue: defaults.string(forKey: "model") ?? "") ?? .turboCompact
+        model = ModelCatalog.model(id: defaults.string(forKey: "modelID") ?? "") ?? ModelCatalog.model(id: ModelCatalog.defaultID)!
         languageCode = defaults.string(forKey: "language") ?? "auto"
         outputMode = OutputMode(rawValue: defaults.string(forKey: "outputMode") ?? "") ?? .original
         extraTargets = Set(defaults.stringArray(forKey: "extraTargets") ?? [])
@@ -130,19 +130,19 @@ final class AppState {
     // MARK: Models
 
     func refreshModels() {
-        downloadedModels = Set(WhisperModel.allCases.filter(Transcriber.isDownloaded))
+        downloadedModels = Set(ModelCatalog.all.filter(Transcriber.isDownloaded).map(\.id))
     }
 
-    func download(_ m: WhisperModel) async throws {
-        guard modelDownloads[m] == nil else { return }
-        modelDownloads[m] = 0
-        defer { modelDownloads[m] = nil; refreshModels() }
+    func download(_ m: ModelInfo) async throws {
+        guard modelDownloads[m.id] == nil else { return }
+        modelDownloads[m.id] = 0
+        defer { modelDownloads[m.id] = nil; refreshModels() }
         try await Transcriber.download(m) { p in
-            Task { @MainActor in if self.modelDownloads[m] != nil { self.modelDownloads[m] = p } }
+            Task { @MainActor in if self.modelDownloads[m.id] != nil { self.modelDownloads[m.id] = p } }
         }
     }
 
-    func deleteModel(_ m: WhisperModel) {
+    func deleteModel(_ m: ModelInfo) {
         try? Transcriber.delete(m)
         refreshModels()
     }
@@ -187,7 +187,7 @@ final class AppState {
                 set(id) { $0.status = .downloadingModel(0) }
                 let observer = Task {
                     while !Task.isCancelled {
-                        if let p = modelDownloads[model] { set(id) { $0.status = .downloadingModel(p) } }
+                        if let p = modelDownloads[model.id] { set(id) { $0.status = .downloadingModel(p) } }
                         try? await Task.sleep(for: .milliseconds(250))
                     }
                 }

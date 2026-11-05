@@ -148,8 +148,8 @@ struct SettingsPanel: View {
                     field("Model", systemImage: "cpu") {
                         HStack(spacing: 6) {
                             Picker("Model", selection: $state.model) {
-                                ForEach(WhisperModel.allCases) { m in
-                                    Text(m.title + (state.downloadedModels.contains(m) ? "" : " ↓")).tag(m)
+                                ForEach(ModelCatalog.all) { m in
+                                    Text(m.name + (state.downloadedModels.contains(m.id) ? "" : " ↓")).tag(m)
                                 }
                             }
                             .labelsHidden()
@@ -379,7 +379,7 @@ struct JobRow: View {
         case .queued:
             status("Waiting", "clock", .secondary)
         case .downloadingModel(let p):
-            progress("Downloading \(state.model.title) model (one-time)…", p)
+            progress("Downloading \(state.model.name) model (one-time)…", p)
         case .loadingModel:
             progress("Loading model… (first load compiles for this Mac and can take a few minutes)", nil)
         case .decoding:
@@ -466,7 +466,7 @@ struct ModelManagerView: View {
             }
             GlassEffectContainer(spacing: 8) {
                 VStack(spacing: 8) {
-                    ForEach(WhisperModel.allCases) { m in row(m) }
+                    ForEach(ModelCatalog.all) { m in row(m) }
                 }
             }
             if let error {
@@ -482,19 +482,19 @@ struct ModelManagerView: View {
         .frame(width: 560)
     }
 
-    private func row(_ m: WhisperModel) -> some View {
+    private func row(_ m: ModelInfo) -> some View {
         HStack {
             Image(systemName: state.model == m ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(state.model == m ? Color.accentColor : .secondary)
                 .onTapGesture { state.model = m }
             VStack(alignment: .leading) {
-                Text(m.title).font(.headline)
-                Text(m.detail).font(.caption).foregroundStyle(.secondary)
+                Text(m.name).font(.headline)
+                Text("\(m.sizeText) · \(m.description)").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            if let p = state.modelDownloads[m] {
+            if let p = state.modelDownloads[m.id] {
                 ProgressView(value: p).frame(width: 120)
-            } else if state.downloadedModels.contains(m) {
+            } else if state.downloadedModels.contains(m.id) {
                 Button(role: .destructive) { state.deleteModel(m) } label: { Image(systemName: "trash") }
                     .buttonStyle(.glass)
                     .disabled(state.isRunning)
