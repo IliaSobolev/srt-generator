@@ -17,8 +17,12 @@ if ! swift test --enable-code-coverage --xunit-output "$REPORTS/tests.xml" > "$R
 fi
 BIN_DIR="$(swift build --show-bin-path)"
 PROFDATA="$(find "$BIN_DIR" .build -name default.profdata -path '*codecov*' 2>/dev/null | head -1)"
-XCTEST="$(find "$BIN_DIR" -name 'SRTCoreTests.xctest' -maxdepth 2 | head -1)"
-BINARY="$XCTEST/Contents/MacOS/SRTCoreTests"
+# Newer SwiftPM builds one bundle per test target (SRTCoreTests.xctest); older ones build a single
+# <Package>PackageTests.xctest. Accept either.
+XCTEST="$(find "$BIN_DIR" -maxdepth 2 -name 'SRTCoreTests.xctest' | head -1)"
+[[ -n "$XCTEST" ]] || XCTEST="$(find "$BIN_DIR" -maxdepth 2 -name '*PackageTests.xctest' | head -1)"
+[[ -n "$XCTEST" && -n "$PROFDATA" ]] || { echo "Could not find the test bundle or profdata under $BIN_DIR" >&2; exit 1; }
+BINARY="$XCTEST/Contents/MacOS/${${XCTEST:t}%.xctest}"
 FILTER=(-ignore-filename-regex='(\.build|Tests)/')
 
 xcrun llvm-cov report "$BINARY" -instr-profile "$PROFDATA" "${FILTER[@]}" Sources/SRTCore
