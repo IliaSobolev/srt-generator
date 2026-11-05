@@ -119,7 +119,7 @@ git tag -a "v$NEW" -m "Release v$NEW"
 
 say "Ready to push:"
 git log --oneline -1
-print "  tag:     v$NEW ($(git rev-parse --short "v$NEW"))"
+print "  tag:     v$NEW -> commit $(git rev-parse --short "v$NEW^{commit}")"
 print "  remote:  $(git remote get-url origin)"
 print "  GitHub Actions will build SRTGenerator-$NEW.dmg and publish the release."
 read -r "answer?Push commit and tag to origin? [y/N] "
