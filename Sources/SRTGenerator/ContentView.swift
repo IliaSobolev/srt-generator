@@ -162,9 +162,10 @@ struct SettingsPanel: View {
                         Picker("Spoken language", selection: $state.languageCode) {
                             Text("Auto-detect").tag("auto")
                             Divider()
-                            ForEach(AppState.whisperLanguages, id: \.code) { Text($0.name).tag($0.code) }
+                            ForEach(AppState.languages(for: state.model), id: \.code) { Text($0.name).tag($0.code) }
                         }
                         .labelsHidden()
+                        .disabled(!state.model.supportsLanguageSelection)
                     }
                 }
                 HStack(spacing: 14) {
@@ -173,6 +174,7 @@ struct SettingsPanel: View {
                             ForEach(OutputMode.allCases) { Text($0.title).tag($0) }
                         }
                         .labelsHidden()
+                        .disabled(!state.model.supportsTranslation)
                     }
                     field("Also translate to", systemImage: "globe") {
                         TranslationTargetsMenu()

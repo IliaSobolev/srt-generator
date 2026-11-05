@@ -34,9 +34,12 @@ actor ParakeetEngine {
         self.model = model
     }
 
-    static func load(_ model: ModelInfo) async throws -> ParakeetEngine {
+    static func load(_ model: ModelInfo, compute: ComputeTarget) async throws -> ParakeetEngine {
         let version = ParakeetStore.version(model)
-        let models = try await AsrModels.load(from: ParakeetStore.folder(model), version: version)
+        let models = try await AsrModels.load(
+            from: ParakeetStore.folder(model), version: version,
+            encoderComputeUnits: compute == .gpu ? .cpuAndGPU : nil
+        )
         let manager = AsrManager()
         try await manager.loadModels(models)
         return ParakeetEngine(manager: manager, model: model)

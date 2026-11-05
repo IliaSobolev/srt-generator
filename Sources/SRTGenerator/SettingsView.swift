@@ -4,8 +4,151 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             Tab("Models", systemImage: "cpu") { ModelsSettingsView() }
+            Tab("Model Settings", systemImage: "slider.horizontal.3") { ModelOptionsView() }
+            Tab("Subtitles", systemImage: "captions.bubble") { SubtitleOptionsView() }
         }
         .frame(width: 640, height: 620)
+    }
+}
+
+// MARK: - Model settings
+
+struct ModelOptionsView: View {
+    @Environment(AppState.self) private var state
+    @State private var newWord = ""
+
+    var body: some View {
+        @Bindable var state = state
+        let model = state.model
+        Form {
+            Section {
+                LabeledContent("Active model") {
+                    Text("\(model.name) · \(model.engine.title)").foregroundStyle(.secondary)
+                }
+                Picker("Spoken language", selection: $state.languageCode) {
+                    Text("Auto-detect").tag("auto")
+                    Divider()
+                    ForEach(AppState.languages(for: model), id: \.code) { Text($0.name).tag($0.code) }
+                }
+                .disabled(!model.supportsLanguageSelection)
+                Toggle("Translate to English", isOn: Binding(
+                    get: { state.outputMode == .english && model.supportsTranslation },
+                    set: { state.outputMode = $0 ? .english : .original }
+                ))
+                .disabled(!model.supportsTranslation)
+            } header: {
+                Text("Language")
+            } footer: {
+                if !model.supportsTranslation {
+                    Text("\(model.name) can't translate. Use a Whisper model, or “Also translate to” in the main window.")
+                } else if !model.supportsLanguageSelection {
+                    Text("\(model.name) only recognizes \(model.languages).")
+                }
+            }
+
+            Section {
+                ForEach(state.settings.customWords, id: \.self) { word in
+                    HStack {
+                        Text(word)
+                        Spacer()
+                        Button { state.settings.customWords.removeAll { $0 == word } } label: {
+                            Image(systemName: "minus.circle.fill")
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                HStack {
+                    TextField("Add a name, term or acronym", text: $newWord)
+                        .onSubmit(addWord)
+                    Button("Add", action: addWord)
+                        .buttonStyle(.glass)
+                        .disabled(newWord.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            } header: {
+                Text("Custom Words")
+            } footer: {
+                Text("Helps Whisper spell names and jargon correctly. Parakeet ignores custom words.")
+            }
+
+            Section("Performance") {
+                Picker("Run on", selection: $state.settings.compute) {
+                    ForEach(ComputeTarget.allCases) { Text($0.title).tag($0) }
+                }
+                Picker("Unload model from memory", selection: $state.settings.unloadTimeout) {
+                    ForEach(UnloadTimeout.allCases) { Text($0.title).tag($0) }
+                }
+            }
+
+            Section {
+                Toggle("Split audio at silences (VAD)", isOn: $state.settings.whisperVAD)
+                Toggle("Retry hard passages (temperature fallback)", isOn: $state.settings.whisperTemperatureFallback)
+                Toggle("Skip non-speech (music, noise)", isOn: $state.settings.whisperSuppressNonSpeech)
+            } header: {
+                Text("Whisper")
+            } footer: {
+                Text(model.engine == .whisper
+                     ? "VAD makes long files faster and reduces hallucinations in silent parts."
+                     : "These options apply only to Whisper models.")
+            }
+            .disabled(model.engine != .whisper)
+
+            Section {
+                Button("Restore Defaults") {
+                    state.settings = TranscriptionSettings()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .disabled(state.isRunning)
+    }
+
+    private func addWord() {
+        let word = newWord.trimmingCharacters(in: .whitespaces)
+        guard !word.isEmpty, !state.settings.customWords.contains(word) else { return }
+        state.settings.customWords.append(word)
+        newWord = ""
+    }
+}
+
+// MARK: - Subtitles
+
+struct SubtitleOptionsView: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        @Bindable var state = state
+        Form {
+            Section("Layout") {
+                LabeledContent("Max characters per line") {
+                    Stepper("\(state.settings.maxLineLength)", value: $state.settings.maxLineLength, in: 20...80, step: 2)
+                }
+                LabeledContent("Max cue duration") {
+                    Stepper(String(format: "%.0f s", state.settings.maxCueDuration),
+                            value: $state.settings.maxCueDuration, in: 2...15, step: 1)
+                }
+            }
+            Section {
+                LabeledContent("Save to") {
+                    HStack {
+                        Text(state.outputFolder?.path(percentEncoded: false) ?? "Same folder as source")
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .foregroundStyle(.secondary)
+                        if state.outputFolder != nil {
+                            Button("Reset") { state.outputFolder = nil }
+                        }
+                        Button("Choose…") { state.chooseOutputFolder() }
+                    }
+                }
+            } header: {
+                Text("Output")
+            } footer: {
+                Text("Files are named “video.srt”, “video.en.srt”, “video.de.srt”… Existing files are never overwritten.")
+            }
+        }
+        .formStyle(.grouped)
+        .disabled(state.isRunning)
     }
 }
 

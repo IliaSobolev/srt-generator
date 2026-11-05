@@ -1,3 +1,4 @@
+import CoreML
 import Foundation
 import WhisperKit
 
@@ -58,15 +59,20 @@ actor Transcriber {
     private var whisper: WhisperKit?
     private var parakeet: ParakeetEngine?
     private var loadedModel: ModelInfo?
+    private var loadedCompute: ComputeTarget?
 
-    func load(_ model: ModelInfo) async throws {
-        if loadedModel == model, whisper != nil || parakeet != nil { return }
+    var isLoaded: Bool { whisper != nil || parakeet != nil }
+
+    func load(_ model: ModelInfo, compute: ComputeTarget) async throws {
+        if loadedModel == model, loadedCompute == compute, isLoaded { return }
         unload()
         switch model.engine {
         case .whisper:
+            let units: MLComputeUnits = compute == .gpu ? .cpuAndGPU : .cpuAndNeuralEngine
             let config = WhisperKitConfig(
                 modelFolder: Self.whisperFolder(model).path,
                 tokenizerFolder: Self.storageRoot,
+                computeOptions: ModelComputeOptions(audioEncoderCompute: units, textDecoderCompute: units),
                 verbose: false,
                 logLevel: .error,
                 prewarm: false,
@@ -75,15 +81,17 @@ actor Transcriber {
             )
             whisper = try await WhisperKit(config)
         case .parakeet:
-            parakeet = try await ParakeetEngine.load(model)
+            parakeet = try await ParakeetEngine.load(model, compute: compute)
         }
         loadedModel = model
+        loadedCompute = compute
     }
 
     func unload() {
         whisper = nil
         parakeet = nil
         loadedModel = nil
+        loadedCompute = nil
     }
 
     // MARK: Transcription
@@ -100,9 +108,10 @@ actor Transcriber {
         samples: [Float],
         language: String?,
         translate: Bool,
+        settings: TranscriptionSettings,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> Output {
-        let builder = CueBuilder()
+        let builder = settings.cueBuilder
         if let parakeet {
             let result = try await parakeet.transcribe(samples: samples, language: language, progress: progress)
             return Output(cues: builder.build(result.segments), language: result.language)
@@ -110,15 +119,26 @@ actor Transcriber {
         guard let whisper else { throw CocoaError(.featureUnsupported) }
         let duration = Double(samples.count) / Double(AudioLoader.sampleRate)
 
+        // Custom words are fed to Whisper as an initial prompt to bias spelling.
+        var promptTokens: [Int]?
+        let words = settings.customWords.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        if !words.isEmpty, let tokenizer = whisper.tokenizer {
+            promptTokens = tokenizer.encode(text: " " + words.joined(separator: ", "))
+                .filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        }
+
         let options = DecodingOptions(
             task: translate ? .translate : .transcribe,
             language: language,
-            temperatureFallbackCount: 3,
+            temperatureFallbackCount: settings.whisperTemperatureFallback ? 3 : 0,
             usePrefillPrompt: true,
             detectLanguage: language == nil,
             skipSpecialTokens: true,
             wordTimestamps: true,
-            chunkingStrategy: .vad
+            promptTokens: promptTokens,
+            suppressBlank: settings.whisperSuppressNonSpeech,
+            noSpeechThreshold: settings.whisperSuppressNonSpeech ? 0.6 : nil,
+            chunkingStrategy: settings.whisperVAD ? .vad : ChunkingStrategy.none
         )
 
         let tracker = ProgressTracker(duration: duration, report: progress)

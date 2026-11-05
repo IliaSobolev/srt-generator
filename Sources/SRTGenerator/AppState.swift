@@ -46,11 +46,23 @@ enum OutputMode: String, CaseIterable, Identifiable {
 @MainActor @Observable
 final class AppState {
     // MARK: Settings (persisted)
-    var model: ModelInfo { didSet { defaults.set(model.id, forKey: "modelID") } }
+    var model: ModelInfo {
+        didSet {
+            defaults.set(model.id, forKey: "modelID")
+            if languageCode != "auto", !model.supportsLanguage(languageCode) { languageCode = "auto" }
+            if !model.supportsTranslation, outputMode == .english { outputMode = .original }
+        }
+    }
     var languageCode: String { didSet { defaults.set(languageCode, forKey: "language") } } // "auto" or ISO
     var outputMode: OutputMode { didSet { defaults.set(outputMode.rawValue, forKey: "outputMode") } }
     var extraTargets: Set<String> { didSet { defaults.set(Array(extraTargets), forKey: "extraTargets") } }
     var outputFolder: URL? { didSet { defaults.set(outputFolder?.path, forKey: "outputFolder") } }
+    var settings: TranscriptionSettings { didSet { settings.save(defaults) } }
+
+    /// Spoken-language hint the active model can actually use (nil = auto-detect).
+    var effectiveLanguage: String? {
+        languageCode == "auto" || !model.supportsLanguage(languageCode) ? nil : languageCode
+    }
 
     // MARK: Runtime
     var jobs: [Job] = []
@@ -66,6 +78,7 @@ final class AppState {
 
     private let transcriber = Transcriber()
     private var runTask: Task<Void, Never>?
+    private var unloadTask: Task<Void, Never>?
     private let defaults = UserDefaults.standard
 
     static let whisperLanguages: [(name: String, code: String)] = Constants.languages
@@ -74,12 +87,18 @@ final class AppState {
         .map { (name: $0.value, code: $0.key) }
         .sorted { $0.name < $1.name }
 
+    static func languages(for model: ModelInfo) -> [(name: String, code: String)] {
+        guard let codes = model.languageCodes else { return whisperLanguages }
+        return whisperLanguages.filter { codes.contains($0.code) }
+    }
+
     init() {
         model = ModelCatalog.model(id: defaults.string(forKey: "modelID") ?? "") ?? ModelCatalog.model(id: ModelCatalog.defaultID)!
         languageCode = defaults.string(forKey: "language") ?? "auto"
         outputMode = OutputMode(rawValue: defaults.string(forKey: "outputMode") ?? "") ?? .original
         extraTargets = Set(defaults.stringArray(forKey: "extraTargets") ?? [])
         outputFolder = defaults.string(forKey: "outputFolder").map { URL(fileURLWithPath: $0) }
+        settings = TranscriptionSettings.load(defaults)
         refreshModels()
         Task { translationTargets = await TranslationBridge.supportedTargets() }
     }
@@ -184,9 +203,23 @@ final class AppState {
             jobs[i].status = .queued
         }
         isRunning = true
+        unloadTask?.cancel()
         runTask = Task {
             await runQueue()
             isRunning = false
+            scheduleUnload()
+        }
+    }
+
+    /// Frees model memory after the configured idle time (HandyAI's "model unload timeout").
+    private func scheduleUnload() {
+        unloadTask?.cancel()
+        let timeout = settings.unloadTimeout
+        guard timeout != .never else { return }
+        unloadTask = Task {
+            try? await Task.sleep(for: .seconds(timeout.rawValue))
+            guard !Task.isCancelled, !isRunning else { return }
+            await transcriber.unload()
         }
     }
 
@@ -224,7 +257,7 @@ final class AppState {
                 try await download(model)
             }
             set(id) { $0.status = .loadingModel }
-            try await transcriber.load(model)
+            try await transcriber.load(model, compute: settings.compute)
 
             set(id) { $0.status = .decoding }
             let samples = try await Task.detached(priority: .userInitiated) {
@@ -236,8 +269,9 @@ final class AppState {
             let translate = outputMode == .english && model.supportsTranslation
             let output = try await transcriber.transcribe(
                 samples: samples,
-                language: languageCode == "auto" ? nil : languageCode,
-                translate: translate
+                language: effectiveLanguage,
+                translate: translate,
+                settings: settings
             ) { p in
                 Task { @MainActor in self.set(id) { if case .transcribing = $0.status { $0.status = .transcribing(p) } } }
             }
@@ -262,8 +296,10 @@ final class AppState {
                 do {
                     let texts = output.cues.map { $0.text.replacingOccurrences(of: "\n", with: " ") }
                     let translated = try await translator.translate(texts, from: source, to: targetLang)
+                    let lineLength = settings.maxLineLength
                     let cues = zip(output.cues, translated).map {
-                        SubtitleCue(start: $0.start, end: $0.end, text: SRTWriter.wrap(CueBuilder.clean($1)))
+                        SubtitleCue(start: $0.start, end: $0.end,
+                                    text: SRTWriter.wrap(CueBuilder.clean($1), maxLine: lineLength))
                     }
                     let url = try write(cues, for: job.url, suffix: target)
                     set(id) { $0.outputs.append(url) }

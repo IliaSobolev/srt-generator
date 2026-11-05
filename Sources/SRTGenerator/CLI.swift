@@ -38,11 +38,12 @@ enum CLI {
             }
             FileHandle.standardError.write("Loading \(model.name)…\n")
             let t = Transcriber()
-            try await t.load(model)
+            let settings = TranscriptionSettings.load()
+            try await t.load(model, compute: settings.compute)
             for file in files {
                 FileHandle.standardError.write("→ \(file.lastPathComponent)\n")
                 let samples = try await AudioLoader.load(file)
-                let out = try await t.transcribe(samples: samples, language: language, translate: english) { _ in }
+                let out = try await t.transcribe(samples: samples, language: language, translate: english && model.supportsTranslation, settings: settings) { _ in }
                 let dir = outDir ?? file.deletingLastPathComponent()
                 let dest = dir.appendingPathComponent(file.deletingPathExtension().lastPathComponent + (english ? ".en" : ""))
                     .appendingPathExtension("srt")

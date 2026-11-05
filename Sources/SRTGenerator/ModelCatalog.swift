@@ -29,6 +29,12 @@ struct ModelInfo: Identifiable, Hashable, Sendable {
     let supportsLanguageSelection: Bool
     /// WhisperKit variant folder in argmaxinc/whisperkit-coreml.
     let whisperVariant: String?
+    /// Spoken languages the model accepts as a hint; nil = every Whisper language.
+    var languageCodes: [String]? = nil
+
+    func supportsLanguage(_ code: String) -> Bool {
+        supportsLanguageSelection && (languageCodes?.contains(code) ?? true)
+    }
 
     var sizeText: String {
         sizeMB >= 1000 ? String(format: "%.1f GB", Double(sizeMB) / 1000) : "\(sizeMB) MB"
@@ -57,14 +63,19 @@ enum ModelCatalog {
                   description: "English only. The best model for English speakers.",
                   sizeMB: 473, engine: .parakeet, accuracy: 0.85, speed: 0.85,
                   languages: "English", supportsTranslation: false, supportsLanguageSelection: false,
-                  whisperVariant: nil),
+                  whisperVariant: nil, languageCodes: ["en"]),
         ModelInfo(id: "parakeet-tdt-0.6b-v3", name: "Parakeet V3", description: "Fast and accurate",
                   sizeMB: 478, engine: .parakeet, accuracy: 0.80, speed: 0.85,
                   languages: "25 European languages", supportsTranslation: false, supportsLanguageSelection: true,
-                  whisperVariant: nil),
+                  whisperVariant: nil, languageCodes: parakeetV3Languages),
     ]
 
     static let defaultID = "small"
+
+    static let parakeetV3Languages = [
+        "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it",
+        "lv", "lt", "mt", "pl", "pt", "ro", "sk", "sl", "es", "sv", "ru", "uk",
+    ]
 
     static func model(id: String) -> ModelInfo? { all.first { $0.id == id } }
 }
