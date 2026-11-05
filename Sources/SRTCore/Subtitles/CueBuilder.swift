@@ -90,10 +90,6 @@ public struct CueBuilder: Sendable, Equatable {
             cue.text = SRTWriter.wrap(cue.text, maxLine: maxLineLength)
             fixed.append(cue)
         }
-        // Pull back any end time that now overlaps the following cue.
-        for i in fixed.indices.dropLast() where fixed[i].end > fixed[i + 1].start {
-            fixed[i].end = max(fixed[i].start + 0.1, fixed[i + 1].start)
-        }
         return fixed
     }
 

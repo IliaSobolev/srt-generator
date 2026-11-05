@@ -96,6 +96,7 @@ public final class JobQueue {
             update(id) { $0.status = .decoding }
             let samples = try await decoder.decode(job.url)
             try Task.checkCancellation()
+            guard !samples.isEmpty else { throw AudioLoader.LoadError.noAudioTrack }
 
             update(id) { $0.status = .transcribing(0) }
             let request = TranscriptionRequest(

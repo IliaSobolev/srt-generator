@@ -112,7 +112,6 @@ public struct AudioLoader: AudioDecoding {
             if let block = buffer.dataBuffer { samples += floats(try block.dataBytes()) }
         }
         try check(reader.status, reader.error)
-        guard !samples.isEmpty else { throw LoadError.noAudioTrack }
         return samples
     }
 
