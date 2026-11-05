@@ -1,6 +1,6 @@
 import Foundation
-import Testing
 @testable import SRTCore
+import Testing
 
 /// A JobQueue wired to fakes, with handles to every dependency.
 @MainActor
@@ -144,7 +144,7 @@ struct JobQueueTests {
         case "transcribe": h.engine.state.withLock { $0.error = .boom(stage) }
         default: h.writer.failingSuffix.withLock { $0 = .some(nil) }
         }
-        let expected: String = switch stage {
+        let expected = switch stage {
         case "silence": "The file has no audio track."
         case "noSpeech": "No speech detected."
         default: "boom: \(stage)"

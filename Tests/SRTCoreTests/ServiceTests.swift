@@ -1,7 +1,7 @@
 import Foundation
+@testable import SRTCore
 import Synchronization
 import Testing
-@testable import SRTCore
 
 @Suite("Model registry")
 struct ModelRegistryTests {
@@ -119,10 +119,10 @@ struct ModelManagerTests {
     }
 
     @Test("A download that leaves files missing is reported as incomplete")
-    func incomplete() async {
+    func incomplete() async throws {
         provider.state.withLock { $0.markDownloaded = false }
         await #expect(throws: TranscriptionError.downloadIncomplete("Whisper Turbo")) {
-            try await manager.download(ModelCatalog.model(id: "turbo")!)
+            try await manager.download(#require(ModelCatalog.model(id: "turbo")))
         }
     }
 
@@ -241,7 +241,7 @@ struct MediaFilesTests {
         let dir = try Fixtures.tempDir()
         let sub = dir.appendingPathComponent("sub", isDirectory: true)
         try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
-        for name in ["b.mp3", "a.webm", "notes.txt", ".hidden.mp3", "sub/c.mov"] {  // .hidden/ files skipped too
+        for name in ["b.mp3", "a.webm", "notes.txt", ".hidden.mp3", "sub/c.mov"] { // .hidden/ files skipped too
             try Data().write(to: dir.appendingPathComponent(name))
         }
         let loose = URL(fileURLWithPath: "/elsewhere/clip.mp4")

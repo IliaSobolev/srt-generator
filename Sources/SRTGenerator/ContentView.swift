@@ -68,7 +68,7 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if state.queue.jobs.contains(where: \.isFinished) && !state.queue.isRunning {
+            if state.queue.jobs.contains(where: \.isFinished), !state.queue.isRunning {
                 Button("Clear Finished") { state.queue.clearFinished() }
                     .buttonStyle(.glass)
             }
@@ -203,7 +203,7 @@ struct SettingsPanel: View {
         .disabled(state.queue.isRunning)
     }
 
-    private func field<Content: View>(_ title: String, systemImage: String, @ViewBuilder content: () -> Content) -> some View {
+    private func field(_ title: String, systemImage: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(title, systemImage: systemImage)
                 .font(.caption.weight(.semibold))

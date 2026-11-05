@@ -6,7 +6,7 @@ enum Entry {
     @MainActor static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
         if args.first == "--cli" {
-            Task { @MainActor in exit(await CLI.run(Array(args.dropFirst()))) }
+            Task { @MainActor in await exit(CLI.run(Array(args.dropFirst()))) }
             dispatchMain()
         } else {
             SRTGeneratorApp.main()

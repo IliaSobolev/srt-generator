@@ -20,7 +20,8 @@ public struct WhisperProvider: ModelProvider {
 
     public func folder(for model: SRTCore.ModelInfo) -> URL {
         storageRoot.appendingPathComponent(
-            "models/argmaxinc/whisperkit-coreml/\(model.whisperVariant ?? model.id)", isDirectory: true)
+            "models/argmaxinc/whisperkit-coreml/\(model.whisperVariant ?? model.id)", isDirectory: true
+        )
     }
 
     public func isDownloaded(_ model: SRTCore.ModelInfo) -> Bool {
@@ -53,19 +54,18 @@ public struct WhisperProvider: ModelProvider {
             load: true,
             download: false
         )
-        return WhisperEngine(pipe: try await WhisperKit(config))
+        return try await WhisperEngine(pipe: WhisperKit(config))
     }
 }
 
 final class WhisperEngine: SpeechEngine, @unchecked Sendable {
-    // WhisperKit is not Sendable; SRTCore's TranscriptionService actor serializes access.
+    /// WhisperKit is not Sendable; SRTCore's TranscriptionService actor serializes access.
     private let pipe: WhisperKit
 
     init(pipe: WhisperKit) { self.pipe = pipe }
 
     func transcribe(samples: [Float], request: TranscriptionRequest, progress: @escaping SRTCore.ProgressHandler)
-        async throws -> EngineResult
-    {
+        async throws -> EngineResult {
         let settings = request.settings
         var promptTokens: [Int]?
         if let prompt = CueBuilder.customWordsPrompt(settings.customWords), let tokenizer = pipe.tokenizer {
@@ -85,7 +85,8 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
             chunkingStrategy: settings.whisperVAD ? .vad : ChunkingStrategy.none
         )
         let tracker = ProgressTracker(
-            duration: Double(samples.count) / Double(AudioLoader.sampleRate), report: progress)
+            duration: Double(samples.count) / Double(AudioLoader.sampleRate), report: progress
+        )
         let results = try await pipe.transcribe(
             audioArray: samples,
             decodeOptions: options,
@@ -95,7 +96,8 @@ final class WhisperEngine: SpeechEngine, @unchecked Sendable {
         let segments = results.flatMap(\.segments).sorted { $0.start < $1.start }.map { seg in
             SpeechSegment(
                 start: Double(seg.start), end: Double(seg.end), text: seg.text,
-                words: seg.words?.map { TimedWord(text: $0.word, start: Double($0.start), end: Double($0.end)) })
+                words: seg.words?.map { TimedWord(text: $0.word, start: Double($0.start), end: Double($0.end)) }
+            )
         }
         return EngineResult(segments: segments, language: results.first?.language ?? request.language ?? "en")
     }

@@ -1,7 +1,7 @@
 import Foundation
+@testable import SRTCore
 import Synchronization
 import Testing
-@testable import SRTCore
 
 @Suite("SRT writer")
 struct SRTWriterTests {
@@ -52,7 +52,7 @@ struct CueBuilderTests {
         let noWords = builder.build([SpeechSegment(start: 0, end: 3, text: text)])
         #expect(noWords.count == 1)
         let oneWord = builder.build([SpeechSegment(start: 0, end: 9, text: "Hi",
-                                                    words: [TimedWord(text: " Hi", start: 0, end: 9)])])
+                                                   words: [TimedWord(text: " Hi", start: 0, end: 9)])])
         #expect(oneWord == [SubtitleCue(start: 0, end: 9, text: "Hi")])
     }
 
@@ -140,7 +140,7 @@ struct SpeechSegmentTests {
 @Suite("Progress tracker")
 struct ProgressTrackerTests {
     @Test("Reports the furthest timestamp as a fraction capped at 0.99")
-    func reports() async {
+    func reports() {
         let values = Mutex<[Double]>([])
         let tracker = ProgressTracker(duration: 10) { v in values.withLock { $0.append(v) } }
         tracker.update([2, 5])

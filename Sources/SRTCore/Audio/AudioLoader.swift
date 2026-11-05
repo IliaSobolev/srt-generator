@@ -109,7 +109,7 @@ public struct AudioLoader: AudioDecoding {
         var samples: [Float] = []
         while let buffer = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
-            if let block = buffer.dataBuffer { samples += floats(try block.dataBytes()) }
+            if let block = buffer.dataBuffer { try samples += floats(block.dataBytes()) }
         }
         try check(reader.status, reader.error)
         return samples

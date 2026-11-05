@@ -39,7 +39,8 @@ enum CLI {
         let state = AppState(deps)
         let config = PipelineConfig(
             model: model, language: language, translateToEnglish: english,
-            outputFolder: outDir, settings: TranscriptionSettings.load(deps.defaults))
+            outputFolder: outDir, settings: TranscriptionSettings.load(deps.defaults)
+        )
         state.queue.add(files)
         FileHandle.standardError.write(Data("Transcribing with \(model.name)…\n".utf8))
         await state.queue.start(config)?.value

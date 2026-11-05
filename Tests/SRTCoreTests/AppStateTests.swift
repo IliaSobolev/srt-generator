@@ -1,6 +1,6 @@
 import Foundation
-import Testing
 @testable import SRTCore
+import Testing
 
 @MainActor
 @Suite("App state")
@@ -20,7 +20,8 @@ struct AppStateTests {
             picker: picker,
             sleeper: ImmediateSleeper(),
             defaults: defaults,
-            languageTable: languageTable))
+            languageTable: languageTable
+        ))
     }
 
     @Test("Fresh install uses defaults")
@@ -38,9 +39,9 @@ struct AppStateTests {
     }
 
     @Test("Every preference persists and is restored")
-    func persistence() {
+    func persistence() throws {
         let state = makeState()
-        state.model = ModelCatalog.model(id: "turbo")!
+        state.model = try #require(ModelCatalog.model(id: "turbo"))
         state.languageCode = "uk"
         state.outputMode = .english
         state.extraTargets = ["de", "fr"]
@@ -96,7 +97,8 @@ struct AppStateTests {
         state.outputFolder = URL(fileURLWithPath: "/o")
         #expect(state.pipelineConfig == PipelineConfig(
             model: Fixtures.whisper, language: "de", translateToEnglish: true, extraTargets: ["fr", "ja"],
-            outputFolder: URL(fileURLWithPath: "/o"), settings: TranscriptionSettings()))
+            outputFolder: URL(fileURLWithPath: "/o"), settings: TranscriptionSettings()
+        ))
     }
 
     @Test("Start runs the queue")
@@ -156,7 +158,8 @@ struct AppStateTests {
     func dependencyDefaults() {
         let deps = AppDependencies(
             registry: ModelRegistry(whisper: provider, parakeet: provider), decoder: FakeDecoder(),
-            translator: nil, picker: picker, languageTable: [:])
+            translator: nil, picker: picker, languageTable: [:]
+        )
         #expect(deps.writer is SubtitleFileWriter)
         #expect(deps.sleeper is TaskSleeper)
         #expect(deps.defaults == .standard)

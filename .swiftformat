@@ -1,0 +1,26 @@
+# SwiftFormat config. `make format` fixes, `make lint` checks. Matches the existing compact style.
+--swift-version 6.2
+--language-mode 5
+--indent 4
+--max-width 140
+--wrap-arguments preserve
+--wrap-parameters preserve
+--wrap-collections preserve
+--closing-paren balanced
+--trailing-commas collections-only
+--strip-unused-args closure-only
+--self remove
+--import-grouping alpha
+--header ignore
+--exclude .build,.tools,dist,.swiftpm
+
+# Disabled on purpose (style, not correctness). The codebase deliberately uses one-line bodies such as
+# `guard x else { return }`, `func isFoo() -> Bool { a && b }` and `for x in y { f(x) }`.
+--disable wrapIfStatementBodies,wrapFunctionBodies,wrapPropertyBodies,wrapLoopBodies,wrapConditionalBodies
+--disable wrapMultilineStatementBraces,redundantReturn
+# Tests use @Test("readable sentence") display names; renaming functions adds churn without value.
+--disable swiftTestingTestCaseNames
+--ranges no-space
+--pattern-let inline
+--decimal-grouping 3,5
+--else-position same-line

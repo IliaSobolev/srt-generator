@@ -49,6 +49,7 @@ public final class AppState {
             if !model.supportsTranslation, outputMode == .english { outputMode = .original }
         }
     }
+
     /// "auto" or an ISO code.
     public var languageCode: String { didSet { defaults.set(languageCode, forKey: Keys.language) } }
     public var outputMode: OutputMode { didSet { defaults.set(outputMode.rawValue, forKey: Keys.outputMode) } }
@@ -77,7 +78,8 @@ public final class AppState {
         models = ModelManager(registry: deps.registry)
         queue = JobQueue(
             transcription: TranscriptionService(registry: deps.registry), models: models, decoder: deps.decoder,
-            writer: deps.writer, translator: deps.translator, sleeper: deps.sleeper)
+            writer: deps.writer, translator: deps.translator, sleeper: deps.sleeper
+        )
 
         let d = deps.defaults
         model = ModelCatalog.model(id: d.string(forKey: Keys.model) ?? "") ?? ModelCatalog.defaultModel
@@ -99,7 +101,8 @@ public final class AppState {
     public var pipelineConfig: PipelineConfig {
         PipelineConfig(
             model: model, language: effectiveLanguage, translateToEnglish: outputMode == .english,
-            extraTargets: extraTargets.sorted(), outputFolder: outputFolder, settings: settings)
+            extraTargets: extraTargets.sorted(), outputFolder: outputFolder, settings: settings
+        )
     }
 
     @discardableResult

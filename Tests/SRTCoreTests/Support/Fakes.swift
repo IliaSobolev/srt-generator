@@ -1,6 +1,6 @@
 import Foundation
-import Synchronization
 @testable import SRTCore
+import Synchronization
 
 enum TestError: Error, Equatable, LocalizedError {
     case boom(String)
@@ -21,7 +21,8 @@ func settle(_ ms: Int = 30) async {
 final class FakeEngine: SpeechEngine {
     struct State {
         var result = EngineResult(
-            segments: [SpeechSegment(start: 0, end: 1.5, text: " Hello world.")], language: "en")
+            segments: [SpeechSegment(start: 0, end: 1.5, text: " Hello world.")], language: "en"
+        )
         var error: TestError?
         var cancellable = false
         var delay: Duration?
@@ -33,8 +34,7 @@ final class FakeEngine: SpeechEngine {
     let state = Mutex(State())
 
     func transcribe(samples: [Float], request: TranscriptionRequest, progress: @escaping ProgressHandler)
-        async throws -> EngineResult
-    {
+        async throws -> EngineResult {
         let (values, delay, error, result) = state.withLock { s in
             s.requests.append(request)
             s.sampleCounts.append(samples.count)

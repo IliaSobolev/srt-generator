@@ -63,7 +63,7 @@ public struct TranscriptionSettings: Codable, Equatable, Sendable {
         defaults.set(try! JSONEncoder().encode(self), forKey: Self.key)
     }
 
-    // Tolerate settings saved by older versions that lack newer keys.
+    /// Tolerate settings saved by older versions that lack newer keys.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = TranscriptionSettings()
