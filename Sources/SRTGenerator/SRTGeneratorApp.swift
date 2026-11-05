@@ -35,6 +35,11 @@ struct SRTGeneratorApp: App {
                     .keyboardShortcut("o")
             }
         }
+
+        Settings {
+            SettingsView()
+                .environment(state)
+        }
     }
 }
 

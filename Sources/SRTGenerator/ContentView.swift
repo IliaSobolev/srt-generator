@@ -5,7 +5,6 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @Environment(AppState.self) private var state
     @State private var isTargeted = false
-    @State private var showModels = false
     @State private var preview: URL?
 
     var body: some View {
@@ -15,7 +14,7 @@ struct ContentView: View {
 
             VStack(spacing: 16) {
                 header
-                SettingsPanel(showModels: $showModels)
+                SettingsPanel()
                 if state.jobs.isEmpty {
                     DropZone(isTargeted: isTargeted)
                 } else {
@@ -31,7 +30,6 @@ struct ContentView: View {
             state.add(urls)
             return true
         } isTargeted: { isTargeted = $0 }
-        .sheet(isPresented: $showModels) { ModelManagerView() }
         .sheet(item: $preview) { SRTPreview(url: $0) }
         // Hidden host for Apple's on-device Translation sessions.
         .background {
@@ -138,7 +136,7 @@ struct AmbientBackground: View {
 
 struct SettingsPanel: View {
     @Environment(AppState.self) private var state
-    @Binding var showModels: Bool
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         @Bindable var state = state
@@ -146,17 +144,19 @@ struct SettingsPanel: View {
             VStack(spacing: 14) {
                 HStack(spacing: 14) {
                     field("Model", systemImage: "cpu") {
-                        HStack(spacing: 6) {
-                            Picker("Model", selection: $state.model) {
-                                ForEach(ModelCatalog.all) { m in
-                                    Text(m.name + (state.downloadedModels.contains(m.id) ? "" : " ↓")).tag(m)
-                                }
+                        Button { openSettings() } label: {
+                            HStack(spacing: 8) {
+                                Text(state.model.name).fontWeight(.medium)
+                                Text(state.downloadedModels.contains(state.model.id) ? state.model.languages : "not downloaded")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer(minLength: 4)
+                                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
                             }
-                            .labelsHidden()
-                            Button { showModels = true } label: { Image(systemName: "slider.horizontal.3") }
-                                .buttonStyle(.glass)
-                                .help("Manage local models")
+                            .frame(maxWidth: 300)
                         }
+                        .buttonStyle(.glass)
+                        .help("Choose and download models (⌘,)")
                     }
                     field("Spoken language", systemImage: "waveform") {
                         Picker("Spoken language", selection: $state.languageCode) {
@@ -443,73 +443,5 @@ struct SRTPreview: View {
             }
         }
         .frame(width: 620, height: 520)
-    }
-}
-
-// MARK: - Models
-
-struct ModelManagerView: View {
-    @Environment(AppState.self) private var state
-    @Environment(\.dismiss) private var dismiss
-    @State private var error: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Whisper Models").font(.title2.bold())
-                    Text("Models are downloaded once, stored locally, and run entirely on your Mac. All support 99 languages.")
-                        .font(.callout).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("Done") { dismiss() }.buttonStyle(.glassProminent)
-            }
-            GlassEffectContainer(spacing: 8) {
-                VStack(spacing: 8) {
-                    ForEach(ModelCatalog.all) { m in row(m) }
-                }
-            }
-            if let error {
-                Text(error).font(.caption).foregroundStyle(.red)
-            }
-            Button("Open Models Folder") {
-                try? FileManager.default.createDirectory(at: Transcriber.storageRoot, withIntermediateDirectories: true)
-                NSWorkspace.shared.open(Transcriber.storageRoot)
-            }
-            .buttonStyle(.glass)
-        }
-        .padding(22)
-        .frame(width: 560)
-    }
-
-    private func row(_ m: ModelInfo) -> some View {
-        HStack {
-            Image(systemName: state.model == m ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(state.model == m ? Color.accentColor : .secondary)
-                .onTapGesture { state.model = m }
-            VStack(alignment: .leading) {
-                Text(m.name).font(.headline)
-                Text("\(m.sizeText) · \(m.description)").font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            if let p = state.modelDownloads[m.id] {
-                ProgressView(value: p).frame(width: 120)
-            } else if state.downloadedModels.contains(m.id) {
-                Button(role: .destructive) { state.deleteModel(m) } label: { Image(systemName: "trash") }
-                    .buttonStyle(.glass)
-                    .disabled(state.isRunning)
-            } else {
-                Button("Download") {
-                    Task {
-                        do { try await state.download(m) } catch { self.error = error.localizedDescription }
-                    }
-                }
-                .buttonStyle(.glass)
-            }
-        }
-        .padding(12)
-        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
-        .contentShape(.rect)
-        .onTapGesture { state.model = m }
     }
 }

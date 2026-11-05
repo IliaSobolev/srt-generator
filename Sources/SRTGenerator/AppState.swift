@@ -57,6 +57,8 @@ final class AppState {
     var isRunning = false
     var downloadedModels: Set<String> = []
     var modelDownloads: [String: Double] = [:]
+    var modelDownloadErrors: [String: String] = [:]
+    private var downloadTasks: [String: Task<Void, Never>] = [:]
     var translationTargets: [Locale.Language] = []
     var lastError: String?
     let translator = TranslationBridge()
@@ -140,6 +142,33 @@ final class AppState {
         try await Transcriber.download(m) { p in
             Task { @MainActor in if self.modelDownloads[m.id] != nil { self.modelDownloads[m.id] = p } }
         }
+    }
+
+    /// One-click flow: download the model if needed, then make it the active model.
+    func downloadAndUse(_ m: ModelInfo) {
+        modelDownloadErrors[m.id] = nil
+        if downloadedModels.contains(m.id) {
+            model = m
+            return
+        }
+        guard downloadTasks[m.id] == nil else { return }
+        downloadTasks[m.id] = Task {
+            defer { downloadTasks[m.id] = nil }
+            do {
+                try await download(m)
+                try Task.checkCancellation()
+                if downloadedModels.contains(m.id) { model = m }
+            } catch is CancellationError {
+            } catch {
+                if !Task.isCancelled { modelDownloadErrors[m.id] = error.localizedDescription }
+            }
+        }
+    }
+
+    func cancelDownload(_ m: ModelInfo) {
+        downloadTasks[m.id]?.cancel()
+        downloadTasks[m.id] = nil
+        modelDownloads[m.id] = nil
     }
 
     func deleteModel(_ m: ModelInfo) {
