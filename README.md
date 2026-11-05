@@ -52,3 +52,32 @@ Whisper models are stored in `~/Library/Application Support/SRTGenerator`, Parak
   Neural Engine or GPU, unload the model after an idle time, and Whisper options (VAD, temperature fallback,
   non-speech suppression).
 - **Subtitles:** max characters per line, max cue duration, and output folder.
+
+## Architecture
+
+```
+SRTGenerator (app + CLI)   SwiftUI views, CLI, LiveDependencies (composition root),
+        │                  TranslationBridge (Apple Translation), PanelFilePicker (AppKit)
+        ▼
+SRTEngines                 WhisperProvider (WhisperKit), ParakeetProvider (FluidAudio)
+        │
+        ▼
+SRTCore                    AppState ─┬─ ModelManager   (downloads, one-click use)
+(no third-party deps)                ├─ JobQueue       (decode → transcribe → write → translate)
+                                     └─ TranscriptionService (loaded engine → subtitle cues)
+                           Protocols: ModelProvider, SpeechEngine, AudioDecoding, Translating,
+                                      SubtitleWriting, FilePicking, Sleeper
+```
+
+All dependencies are injected through `AppDependencies`. The app wires in the real implementations;
+tests wire in fakes.
+
+## Tests
+
+```sh
+swift test               # Swift Testing suite for SRTCore
+scripts/coverage.sh      # coverage table; fails unless SRTCore line coverage is 100%
+```
+
+The `swift-test-writer` Claude Code subagent (`.claude/agents/swift-test-writer.md`) knows these conventions.
+Ask Claude to "use swift-test-writer" after changing `SRTCore`.
