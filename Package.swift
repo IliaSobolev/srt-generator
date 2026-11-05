@@ -1,7 +1,8 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-let settings: [SwiftSetting] = [.swiftLanguageMode(.v5)]
+/// Warnings fail the build for our own targets ("no new warnings" is part of the definition of done).
+let settings: [SwiftSetting] = [.swiftLanguageMode(.v5), .treatAllWarnings(as: .error)]
 
 let package = Package(
     name: "SRTGenerator",

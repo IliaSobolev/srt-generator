@@ -26,8 +26,8 @@ struct QueueHarness {
                          translator: translator, sleeper: sleeper)
     }
 
-    static let a = URL(fileURLWithPath: "/media/a.mp4")
-    static let b = URL(fileURLWithPath: "/media/b.mkv")
+    nonisolated static let a = URL(fileURLWithPath: "/media/a.mp4")
+    nonisolated static let b = URL(fileURLWithPath: "/media/b.mkv")
 
     func run(_ config: PipelineConfig = PipelineConfig(model: Fixtures.whisper), urls: [URL] = [a]) async -> [Job] {
         queue.add(urls)
